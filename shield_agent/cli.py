@@ -50,6 +50,9 @@ def scan(dir, ollama):
 
     console.print(table)
     console.print(f"\n[bold red]Total issues found: {len(issues)}[/bold red]")
+    
+    # Exit with code 1 so CI/CD and Git hooks can detect failure
+    os._exit(1)
 
 @main.command()
 @click.argument("file", type=click.Path(exists=True))

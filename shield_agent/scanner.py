@@ -1,7 +1,13 @@
 import re
+import os
+import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict
 from pydantic import BaseModel
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("shield_agent.scanner")
 
 class Issue(BaseModel):
     file_path: str
@@ -18,10 +24,13 @@ class LocalScanner:
     """
     
     # Common Patterns (Secrets & PII)
-    PATTERNS = {
+    PATTERNS: Dict[str, str] = {
         "Email Address": r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",
-        "Generic API Key": r"(?:key|api|token|secret|password|auth)(?:[\s|'|\"]*)[:|=](?:[\s|'|\"]*)([a-zA-Z0-9\-_]{16,})",
+        "Generic API Key": r"(?i)(?:key|api|token|secret|password|auth)(?:[\s|'|\"]*)[:|=](?:[\s|'|\"]*)([a-z0-9\-_]{16,})",
         "AWS Access Key": r"AKIA[0-9A-Z]{16}",
+        "Azure Secret": r"[a-z0-9]{3,45}~[a-z0-9._\-]{2,256}",
+        "Stripe Secret Key": r"sk_(?:test|live)_[0-9a-zA-Z]{24,}",
+        "GitHub Personal Access Token": r"ghp_[a-zA-Z0-9]{36}",
         "Private Key": r"-----BEGIN (?:RSA|OPENSSH|PRIVATE) KEY-----",
         "IPv4 Address": r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
     }
@@ -50,8 +59,7 @@ class LocalScanner:
                                 description=f"Potential {name} detected."
                             ))
         except Exception as e:
-            # TODO: Add logging
-            pass
+            logger.error(f"Error scanning file {file_path}: {e}")
         return issues
 
     def _is_likely_false_positive(self, value: str) -> bool:
@@ -67,13 +75,14 @@ class LocalScanner:
 
     def verify_with_ollama(self, issue: Issue) -> bool:
         """
-        Uses a local LLM (Ollama/Gemma 2) to verify if a detection is a real secret.
+        Uses a local LLM (Ollama) to verify if a detection is a real secret.
         """
         import requests
+        ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
         try:
             prompt = f"Identify if the following string is likely a real sensitive API key or secret password. Respond with only 'YES' or 'NO'.\nString: {issue.content}"
             response = requests.post(
-                "http://localhost:11434/api/generate",
+                f"{ollama_host}/api/generate",
                 json={
                     "model": "gemma2",
                     "prompt": prompt,
@@ -84,8 +93,8 @@ class LocalScanner:
             if response.status_code == 200:
                 result = response.json().get("response", "").strip().upper()
                 return "YES" in result
-        except Exception:
-            # Fallback to True if Ollama is not available to be safe
+        except Exception as e:
+            logger.warning(f"Ollama verification failed: {e}. Falling back to detection.")
             return True
         return True
 
