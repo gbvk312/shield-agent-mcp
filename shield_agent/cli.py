@@ -97,5 +97,22 @@ fi
     os.chmod(pre_push_path, 0o755)
     console.print("[bold green]🚀 Pre-push hook installed successfully![/bold green]")
 
+@main.command()
+def run_mcp():
+    """Start the ShieldAgent MCP server for integration with AI assistants."""
+    try:
+        from .mcp_server import mcp, HAS_MCP
+        if not HAS_MCP:
+            console.print("[bold red]Error: MCP dependencies not found or incompatible Python version.[/bold red]")
+            console.print("Note: MCP requires Python 3.10+ and the 'mcp' package.")
+            console.print("Install with: pip install 'shield-agent-mcp[mcp]'")
+            return
+        
+        console.print("[bold green]🛡️ Starting ShieldAgent MCP Server...[/bold green]")
+        # FastMCP.run() defaults to stdio if no arguments are passed
+        mcp.run()
+    except Exception as e:
+        console.print(f"[bold red]Error: Failed to start MCP server: {e}[/bold red]")
+
 if __name__ == "__main__":
     main()

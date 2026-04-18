@@ -3,69 +3,107 @@
 
 ![ShieldAgent-MCP Logo](docs/logo.png)
 
-**ShieldAgent-MCP** is a cutting-edge, production-ready security tool designed for modern developer workflows. It leverages the power of **Hybrid AI**—combining the deep reasoning of **Google Gemini Pro** with the lightning-fast, privacy-safe execution of **Local Gemma models (via Ollama)**.
-
-As an **MCP (Model Context Protocol)** server, ShieldAgent-MCP integrates seamlessly with AI coding assistants like Claude, Cursor, and ChatGPT, giving them the "Superpowers" needed to protect your codebase from the inside out.
+**ShieldAgent-MCP** is a cutting-edge security and code quality auditor designed for modern developer workflows. It combines the speed of local scanning with the intelligence of high-end LLMs to protect your codebase from PII leaks, secrets exposure, and architectural vulnerabilities.
 
 ---
 
 ## 🔥 Why ShieldAgent-MCP?
 
-In 2026, security is no longer just about static analysis; it's about **context**. ShieldAgent-MCP provides:
+In an AI-native development world, security must be proactive and context-aware. ShieldAgent-MCP provides:
 
-- **Local Sentinel (Zero-Cloud)**: High-speed PII and secret scanning that never leaves your machine.
-- **Cloud Auditor (Deep Intelligence)**: Advanced architectural reviews and logic flaw detection powered by Gemini.
-- **MCP Integration**: A standardized way for your AI agents to "ask" for security audits.
-- **Git Gating**: Automated pre-push hooks to ensure no secret ever hits the wire.
+- **Local Sentinel (Privacy-First)**: High-speed scanning for API keys and PII that never leaves your machine.
+- **Cloud Auditor (Deep Intelligence)**: Advanced architectural reviews and logic flaw detection powered by **Google Gemini 1.5 Pro**.
+- **MCP Native**: Seamlessly integrates with AI assistants like Claude, Cursor, and ChatGPT.
+- **Automated Gating**: Simple Git hooks to prevent security regressions before they are pushed.
 
 ---
 
 ## 🚀 Key Features
 
 ### 1. Dual-Layer Scanning
-- **Privacy Layer**: Uses local RegEx + Ollama/Gemma to detect sensitive data (API keys, PII, Credentials).
-- **Intelligence Layer**: Uses Gemini 1.5 Pro to identify complex vulnerabilities like "Broken Access Control" or "Insecure Architecture" patterns.
+- **Local Layer**: Uses optimized Regex patterns to detect AWS keys, Private Keys, Emails, and IP addresses. 
+- **Verification Layer (Local AI)**: Optional verification via **Ollama (Gemma 2)** to reduce false positives.
+- **Intelligence Layer (Cloud AI)**: Deep analysis of code logic and security patterns using **Gemini 1.5 Pro**.
 
-### 2. Model Context Protocol (MCP) Ready
-Exposes high-level security tools to your AI agent ecosystem:
-- `audit_codebase`: Performs a full structural review.
-- `scan_for_secrets`: Checks for potential leaks in the current diff.
+### 2. Model Context Protocol (MCP) Integration
+Exposes standardized tools to your AI agent ecosystem:
+- `scan_for_secrets`: Fast local scan for the current project.
+- `audit_codebase`: Deep architectural review of specific files.
 
-### 3. Beautiful Terminal Experience
-Powered by `rich`, providing clear, actionable, and aesthetic security reports directly in your CLI.
-
----
-
-## 🛠️ Tech Stack
-
-- **Core**: Python 3.10+
-- **Cloud AI**: Google Gemini API
-- **Local AI**: Ollama (Gemma 2)
-- **Protocol**: MCP (Python SDK)
-- **Interface**: Click + Rich
+### 3. Developer Experience
+- **Beautiful CLI**: Powered by `rich` for aesthetic, actionable reports.
+- **Git Hooks**: One-command installation for pre-push security gates.
+- **Python-Native**: Easily extensible using Pydantic and Click.
 
 ---
 
-## 🏗️ Installation (Coming Soon)
+## 🏗️ Installation
 
+### Using `uv` (Recommended)
 ```bash
-# Clone the repo
+# Clone and install
 git clone https://github.com/gbvk/shield-agent-mcp.git
 cd shield-agent-mcp
+uv sync
 
-# Install dependencies
-pip install -r requirements.txt
-pip install -e .
+# Run directly
+uv run shield-agent --help
+```
 
-# Install Git hooks
-shield-agent install-hooks
+### Using `pip`
+```bash
+pip install .
+# Or with MCP support explicitly
+pip install ".[mcp]"
 ```
 
 ---
 
+## 🛠️ Usage
+
+### 1. Local Security Scan
+Scan a directory for potential leaks (Secrets, PII):
+```bash
+shield-agent scan --dir .
+```
+*Add `--ollama` to use local AI verification (requires Ollama running).*
+
+### 2. Deep AI Audit
+Analyze a specific file for logic flaws and security risks:
+```bash
+shield-agent audit path/to/file.py
+```
+
+### 3. Git Pre-Push Hook
+Ensure security checks run before every push:
+```bash
+shield-agent install-hooks
+```
+
+### 4. Run MCP Server
+Launch the server to connect with Claude Desktop or Cursor:
+```bash
+shield-agent run-mcp
+```
+
+---
+
+## ⚙️ Configuration
+
+ShieldAgent-MCP uses environment variables for sensitive configurations. Create a `.env` file in your project root:
+
+```env
+GEMINI_API_KEY=your_google_gemini_api_key_here
+```
+
+For detailed configuration (including Ollama setup), see [CONFIGURATION.md](docs/CONFIGURATION.md).
+
+---
+
 ## 📄 License
+
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-*Built with ❤️ for the AI-Native Developer.*
+*Built with ❤️ for the AI-Native Developer by [gbvk312](https://github.com/gbvk312).*
