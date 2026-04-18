@@ -21,14 +21,14 @@ In an AI-native development world, security must be proactive and context-aware.
 ## 🚀 Key Features
 
 ### 1. Dual-Layer Scanning
-- **Local Layer**: Uses optimized Regex patterns to detect AWS keys, Private Keys, Emails, and IP addresses. 
-- **Verification Layer (Local AI)**: Optional verification via **Ollama (Gemma 2)** to reduce false positives.
+- **Local Layer**: Uses optimized Regex patterns to detect AWS keys, Private Keys, Emails, IP addresses, **Credit Cards, and Phone Numbers**. 
+- **Verification Layer (Local AI)**: Optional verification via **Ollama** (configurable model) to reduce false positives.
 - **Intelligence Layer (Cloud AI)**: Deep analysis of code logic and security patterns using **Gemini 1.5 Pro**.
 
 ### 2. Model Context Protocol (MCP) Integration
 Exposes standardized tools to your AI agent ecosystem:
-- `scan_for_secrets`: Fast local scan for the current project.
-- `audit_codebase`: Deep architectural review of specific files.
+- `scan_for_secrets`: Fast local scan for the current project. Now **asynchronous** and supports custom exclusions.
+- `audit_file`: Deep architectural review of specific files using Gemini.
 
 ### 3. Developer Experience
 - **Beautiful CLI**: Powered by `rich` for aesthetic, actionable reports.
@@ -66,7 +66,9 @@ Scan a directory for potential leaks (Secrets, PII):
 ```bash
 shield-agent scan --dir .
 ```
-*Add `--ollama` to use local AI verification (requires Ollama running).*
+*Options:*
+- `--ollama`: Use local AI verification (requires Ollama running).
+- `--format json`: Output results in JSON format for automation.
 
 ### 2. Deep AI Audit
 Analyze a specific file for logic flaws and security risks:

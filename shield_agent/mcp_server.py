@@ -15,10 +15,22 @@ if HAS_MCP:
     mcp = FastMCP("ShieldAgent")
 
     @mcp.tool()
-    def scan_for_secrets(directory: str = ".") -> str:
-        """Scans the specified directory for sensitive data leaks (PII, Secrets)."""
-        scanner = LocalScanner(directory)
-        issues = scanner.scan_directory()
+    async def scan_for_secrets(directory: str = ".", use_ollama: bool = False) -> str:
+        """
+        Scans specified directory for sensitive data leaks (PII, Secrets).
+        
+        Args:
+            directory: The path to the directory to scan.
+            use_ollama: Whether to use local Ollama for verification (requires OLLAMA_HOST).
+        """
+        import anyio
+        
+        def run_scan():
+            scanner = LocalScanner(directory)
+            return scanner.scan_directory(use_ollama=use_ollama)
+            
+        issues = await anyio.to_thread.run_sync(run_scan)
+        
         if not issues:
             return "✅ No security issues found."
         
@@ -28,20 +40,25 @@ if HAS_MCP:
         return report
 
     @mcp.tool()
-    def audit_codebase(file_path: str) -> str:
+    async def audit_file(file_path: str) -> str:
         """Performs a deep Gemini-powered security audit on a specific file."""
+        import anyio
+        
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             return "❌ Error: GEMINI_API_KEY not configured."
         
-        auditor = CloudAuditor(api_key)
         path = Path(file_path)
         if not path.exists():
             return f"❌ Error: File {file_path} not found."
             
-        with open(path, "r", encoding="utf-8") as f:
-            content = f.read()
-        return auditor.audit_file(path, content)
+        async def run_audit():
+            auditor = CloudAuditor(api_key)
+            with open(path, "r", encoding="utf-8") as f:
+                content = f.read()
+            return auditor.audit_file(path, content)
+            
+        return await anyio.to_thread.run_sync(run_audit)
 
 else:
     def main():

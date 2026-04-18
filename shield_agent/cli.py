@@ -1,5 +1,6 @@
 import click
 import os
+import json
 from pathlib import Path
 from rich.console import Console
 from rich.table import Table
@@ -7,9 +8,7 @@ from rich.panel import Panel
 from rich.markdown import Markdown
 from .scanner import LocalScanner
 from .auditor import CloudAuditor
-from dotenv import load_dotenv
-
-load_dotenv()
+from .config import config
 
 console = Console()
 
@@ -21,13 +20,20 @@ def main():
 @main.command()
 @click.option("--dir", default=".", help="Directory to scan")
 @click.option("--ollama", is_flag=True, help="Use local Ollama for verification")
-def scan(dir, ollama):
+@click.option("--format", type=click.Choice(["text", "json"]), default="text", help="Output format")
+def scan(dir, ollama, format):
     """Run a local security scan for PII and secrets."""
     scanner = LocalScanner(dir)
     
     with console.status("[bold green]Scanning for leaks..."):
         issues = scanner.scan_directory(use_ollama=ollama)
     
+    if format == "json":
+        click.echo(json.dumps([i.model_dump() for i in issues], indent=2))
+        if issues:
+            os._exit(1)
+        return
+
     if not issues:
         console.print("[bold green]✅ No issues found! Clean codebase.[/bold green]")
         return
@@ -58,7 +64,7 @@ def scan(dir, ollama):
 @click.argument("file", type=click.Path(exists=True))
 def audit(file):
     """Perform a deep AI audit on a specific file using Gemini."""
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = config.GEMINI_API_KEY
     if not api_key:
         console.print("[bold red]Error: GEMINI_API_KEY not found in environment or .env file.[/bold red]")
         return
@@ -84,14 +90,21 @@ def install_hooks():
     hooks_dir = git_dir / "hooks"
     pre_push_path = hooks_dir / "pre-push"
     
-    # Template for the pre-push hook
+    # Template for the pre-push hook (more robust)
     hook_content = """#!/bin/bash
 # ShieldAgent-MCP Pre-Push Hook
+echo "🛡️ ShieldAgent-MCP: Scanning for secrets before push..."
+
+# Only scan files that are about to be pushed (heuristic: diff against remote)
+# For simplicity, we scan the whole directory but you could optimize this
 shield-agent scan --dir .
+
 if [ $? -ne 0 ]; then
-    echo "❌ Push blocked by ShieldAgent-MCP. Fix security issues first."
+    echo "❌ Push blocked by ShieldAgent-MCP. Fix the security issues listed above before pushing."
     exit 1
 fi
+echo "✅ Security scan passed. Proceeding with push."
+exit 0
 """
     
     with open(pre_push_path, "w") as f:
