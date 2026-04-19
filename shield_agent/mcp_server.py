@@ -39,6 +39,32 @@ if HAS_MCP:
         return report
 
     @mcp.tool()
+    async def list_directory(directory: str = ".") -> str:
+        """
+        Lists files and directories in the specified path.
+        
+        Args:
+            directory: The path to the directory to list.
+        """
+        path = Path(directory)
+        if not path.exists():
+            return f"❌ Error: Directory {directory} not found."
+        
+        try:
+            items = os.listdir(path)
+            if not items:
+                return f"📁 Directory {directory} is empty."
+            
+            output = f"📁 Contents of {directory}:\n"
+            for item in sorted(items):
+                is_dir = (path / item).is_dir()
+                prefix = "📁 " if is_dir else "📄 "
+                output += f"{prefix}{item}\n"
+            return output
+        except Exception as e:
+            return f"❌ Error listing directory: {e}"
+
+    @mcp.tool()
     async def audit_file(file_path: str) -> str:
         """Performs a deep Gemini-powered security audit on a specific file."""
         import anyio

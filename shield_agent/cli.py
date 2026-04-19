@@ -142,11 +142,11 @@ def run_mcp():
             console.print("Install with: pip install 'shield-agent-mcp[mcp]'")
             return
         
-        console.print("[bold green]🛡️ Starting ShieldAgent MCP Server...[/bold green]")
+        print("🛡️ Starting ShieldAgent MCP Server...", file=sys.stderr)
         # FastMCP.run() defaults to stdio if no arguments are passed
         mcp.run()
     except Exception as e:
-        console.print(f"[bold red]Error: Failed to start MCP server: {e}[/bold red]")
+        print(f"Error: Failed to start MCP server: {e}", file=sys.stderr)
 
 if __name__ == "__main__":
     main()
