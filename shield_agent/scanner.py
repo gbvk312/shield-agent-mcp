@@ -24,6 +24,18 @@ class LocalScanner:
     LocalSentinel: Privacy-first scanner for PII and Secrets.
     Uses high-speed regex patterns and optional local LLM verification.
     """
+
+    # Binary file extensions to skip during scanning
+    BINARY_EXTENSIONS = {
+        ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".svg", ".webp",
+        ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+        ".zip", ".tar", ".gz", ".bz2", ".7z", ".rar",
+        ".exe", ".dll", ".so", ".dylib", ".bin",
+        ".mp3", ".mp4", ".avi", ".mov", ".wav", ".flac",
+        ".woff", ".woff2", ".ttf", ".otf", ".eot",
+        ".pyc", ".pyo", ".class", ".o",
+    }
+
     
     # Common Patterns (Secrets & PII)
     PATTERNS: Dict[str, str] = {
@@ -82,12 +94,22 @@ class LocalScanner:
 
     def _is_likely_false_positive(self, value: str) -> bool:
         """Heuristics to filter out non-secrets."""
+        if not value:
+            return True
         # Too many repetitive characters
         if len(set(value)) < 4:
             return True
-        # Common placeholder names
-        placeholders = {"YOUR_API_KEY", "example_token", "SECRET_KEY_HERE"}
-        if value in placeholders:
+        # Common placeholder names and patterns
+        placeholders = {
+            "YOUR_API_KEY", "example_token", "SECRET_KEY_HERE",
+            "your_google_gemini_api_key_here", "your_gemini_api_key_here",
+            "your_api_key_here",
+        }
+        if value.lower() in {p.lower() for p in placeholders}:
+            return True
+        # Catch generic placeholder patterns
+        lower = value.lower()
+        if lower.startswith("your_") or lower.endswith("_here"):
             return True
         return False
 
@@ -119,11 +141,14 @@ class LocalScanner:
 
     def scan_directory(self, exclude_dirs: Optional[List[str]] = None, use_ollama: bool = False, max_workers: int = 4) -> List[Issue]:
         all_issues = []
-        static_exclude = set(exclude_dirs or [".git", "__pycache__", "venv", "node_modules"])
+        static_exclude = set(exclude_dirs or [".git", "__pycache__", "venv", ".venv", "node_modules", "scratch"])
         
         files_to_scan = []
         for p in self.root_path.rglob("*"):
             if p.is_file():
+                # Skip binary files
+                if p.suffix.lower() in self.BINARY_EXTENSIONS:
+                    continue
                 # Check static excludes and .gitignore
                 if any(part in static_exclude for part in p.parts):
                     continue

@@ -10,7 +10,7 @@ authors = [
 ]
 description = "A Hybrid-AI Security & Quality Sentinel for the MCP Era"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -20,7 +20,7 @@ dependencies = [
     "mcp>=1.0.0",
     "click>=8.0.0",
     "rich>=13.0.0",
-    "google-generativeai>=0.4.0",
+    "google-genai>=1.0.0",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
     "gitpython>=3.1.0",

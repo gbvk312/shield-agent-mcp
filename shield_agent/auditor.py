@@ -1,18 +1,19 @@
 import os
-import google.generativeai as genai
-from typing import List, Optional
+from typing import Optional
 from pathlib import Path
+from google import genai
 from .scanner import Issue
+
 
 class CloudAuditor:
     """
-    CloudAuditor: Deep Intelligence Layer using Gemini Pro.
+    CloudAuditor: Deep Intelligence Layer using Gemini.
     Analyzes code for logic flaws, architectural issues, and complex vulnerabilities.
     """
 
     def __init__(self, api_key: str):
-        genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-1.5-pro')
+        self.client = genai.Client(api_key=api_key)
+        self.model_id = "gemini-2.0-flash"
 
     def audit_file(self, file_path: Path, content: str) -> str:
         """Performs a deep audit of a single file."""
@@ -32,7 +33,10 @@ class CloudAuditor:
         ---
         """
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model=self.model_id,
+                contents=prompt,
+            )
             return response.text
         except Exception as e:
             return f"Error during cloud audit: {str(e)}"
@@ -49,7 +53,10 @@ class CloudAuditor:
         ---
         """
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model=self.model_id,
+                contents=prompt,
+            )
             return response.text
         except Exception as e:
             return f"Error during diff audit: {str(e)}"
