@@ -77,13 +77,83 @@ if HAS_MCP:
         if not path.exists():
             return f"❌ Error: File {file_path} not found."
             
-        async def run_audit():
+        def run_audit():
             auditor = CloudAuditor(api_key)
             with open(path, "r", encoding="utf-8") as f:
                 content = f.read()
             return auditor.audit_file(path, content)
             
         return await anyio.to_thread.run_sync(run_audit)
+
+    @mcp.tool()
+    async def safe_write_file(file_path: str, content: str, reason: str) -> str:
+        """
+        Safely writes or updates a file with a mandatory justification.
+        Used by remediation agents to fix security vulnerabilities.
+        
+        Args:
+            file_path: The path to the file to write.
+            content: The new content for the file.
+            reason: The security justification for this change.
+        """
+        import anyio
+        
+        path = Path(file_path)
+        
+        def do_write():
+            # Basic safety: don't write to sensitive system paths (simulated)
+            base_name = path.name.lower()
+            if base_name in (".env", "id_rsa", ".ssh"):
+                 return f"⚠️ Warning: Direct write to {base_name} is restricted. Use specialized tools for secrets."
+            
+            # Create backup if exists
+            if path.exists():
+                backup = path.with_suffix(path.suffix + ".bak")
+                path.replace(backup)
+                backup_msg = f" (Backup created at {backup.name})"
+            else:
+                backup_msg = ""
+
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(content)
+            
+            return f"✅ Successfully wrote {file_path}. Reason: {reason}{backup_msg}"
+
+        return await anyio.to_thread.run_sync(do_write)
+
+    @mcp.tool()
+    async def check_network_exposure() -> str:
+        """
+        Checks for risky network listening ports on the local machine.
+        Identifies potential exposure of services.
+        """
+        import subprocess
+        import anyio
+
+        def run_check():
+            try:
+                # Use lsof for macOS/Linux to find listening ports
+                result = subprocess.run(
+                    ["lsof", "-i", "-P", "-n"], 
+                    capture_output=True, 
+                    text=True, 
+                    check=True
+                )
+                lines = result.stdout.splitlines()
+                listeners = [l for l in lines if "LISTEN" in l]
+                
+                if not listeners:
+                    return "✅ No open listening ports detected."
+                
+                report = "🔍 Found the following listening services:\n"
+                for listener in listeners:
+                    report += f"- {listener}\n"
+                return report
+            except Exception as e:
+                return f"❌ Error checking network: {e}"
+
+        return await anyio.to_thread.run_sync(run_check)
 
 else:
     def main():
