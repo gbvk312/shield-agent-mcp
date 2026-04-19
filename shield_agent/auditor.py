@@ -34,7 +34,7 @@ class CloudAuditor:
                 model=self.model_id,
                 contents=prompt,
             )
-            return response.text
+            return response.text or "No response generated."
         except Exception as e:
             return f"Error during cloud audit: {str(e)}"
 
@@ -54,6 +54,6 @@ class CloudAuditor:
                 model=self.model_id,
                 contents=prompt,
             )
-            return response.text
+            return response.text or "No response generated."
         except Exception as e:
             return f"Error during diff audit: {str(e)}"

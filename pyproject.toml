@@ -40,3 +40,8 @@ shield-agent = "shield_agent.cli:main"
 
 [tool.setuptools]
 packages = ["shield_agent"]
+
+[dependency-groups]
+dev = [
+    "types-requests>=2.33.0.20260408",
+]
