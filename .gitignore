@@ -1,7 +1,7 @@
 # Environment
 .env
 .env.local
-.venv
+.venv/
 venv/
 env/
 
@@ -10,18 +10,26 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Testing & Linting
 .pytest_cache/
 .coverage
 htmlcov/
-dist/
-build/
-*.egg-info/
+.mypy_cache/
+.ruff_cache/
 
 # OS
 .DS_Store
 Thumbs.db
 
+# IDE
+.vscode/
+.idea/
+
 # Project Specific
-!docs/
-tests/test_secret.py
 scratch/
+tests/test_secret.py
