@@ -1,5 +1,4 @@
 import os
-from typing import Optional
 from pathlib import Path
 from .scanner import LocalScanner
 from .auditor import CloudAuditor

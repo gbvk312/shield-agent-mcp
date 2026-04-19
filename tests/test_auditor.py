@@ -1,4 +1,3 @@
-import pytest
 from unittest.mock import MagicMock, patch
 from shield_agent.auditor import CloudAuditor
 from pathlib import Path

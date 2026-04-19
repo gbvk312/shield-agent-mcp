@@ -1,8 +1,5 @@
-import os
-from typing import Optional
 from pathlib import Path
 from google import genai
-from .scanner import Issue
 
 
 class CloudAuditor:
