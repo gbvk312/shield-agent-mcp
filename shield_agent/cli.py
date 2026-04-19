@@ -20,7 +20,7 @@ def main():
 @main.command()
 @click.option("--dir", default=".", help="Directory to scan")
 @click.option("--ollama", is_flag=True, help="Use local Ollama for verification")
-@click.option("--format", type=click.Choice(["text", "json"]), default="text", help="Output format")
+@click.option("--format", type=click.Choice(["text", "json", "jsonl"]), default="text", help="Output format")
 def scan(dir, ollama, format):
     """Run a local security scan for PII and secrets."""
     scanner = LocalScanner(dir)
@@ -30,6 +30,12 @@ def scan(dir, ollama, format):
     
     if format == "json":
         click.echo(json.dumps([i.model_dump() for i in issues], indent=2))
+        if issues:
+            os._exit(1)
+        return
+    elif format == "jsonl":
+        for issue in issues:
+            click.echo(json.dumps(issue.model_dump()))
         if issues:
             os._exit(1)
         return
@@ -83,11 +89,15 @@ def audit(file):
 def install_hooks():
     """Install pre_push git hooks."""
     git_dir = Path(".git")
-    if not git_dir.exists():
-        console.print("[bold red]Error: No .git directory found. Run this in the repo root.[/bold red]")
+    hooks_dir = Path(".git/hooks")
+    
+    if not hooks_dir.exists():
+        if git_dir.is_file():
+            console.print("[bold red]Error: .git is a file (likely a submodule). Hook installation not supported directly.[/bold red]")
+        else:
+            console.print("[bold red]Error: No .git/hooks directory found. Run this in the repo root.[/bold red]")
         return
         
-    hooks_dir = git_dir / "hooks"
     pre_push_path = hooks_dir / "pre-push"
     
     # Template for the pre-push hook (more robust)

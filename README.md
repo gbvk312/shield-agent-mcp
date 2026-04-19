@@ -68,7 +68,7 @@ shield-agent scan --dir .
 ```
 *Options:*
 - `--ollama`: Use local AI verification (requires Ollama running).
-- `--format json`: Output results in JSON format for automation.
+- `--format json` or `--format jsonl`: Output results in structured format for automation.
 
 ### 2. Deep AI Audit
 Analyze a specific file for logic flaws and security risks:
@@ -98,7 +98,12 @@ ShieldAgent-MCP uses environment variables for sensitive configurations. Create 
 GEMINI_API_KEY=your_google_gemini_api_key_here
 ```
 
-For detailed configuration (including Ollama setup), see [CONFIGURATION.md](docs/CONFIGURATION.md).
+## 📄 Documentation & Architecture
+
+For more details on how to build, configure, or extend ShieldAgent-MCP, please refer to the following guides:
+- [Configuration Guide](docs/CONFIGURATION.md): Detailed configuration including Ollama integration.
+- [Architecture Context](docs/CONTEXT.md): System design, dependencies, and internal flows.
+- [Development Guide](docs/DEVELOPMENT.md): Best practices and workflows for contributing.
 
 ---
 

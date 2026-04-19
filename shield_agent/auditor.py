@@ -1,5 +1,6 @@
 from pathlib import Path
 from google import genai
+from google.genai import types
 
 
 class CloudAuditor:
@@ -11,28 +12,25 @@ class CloudAuditor:
     def __init__(self, api_key: str):
         self.client = genai.Client(api_key=api_key)
         self.model_id = "gemini-2.0-flash"
+        self.system_instruction = """
+You are an expert security researcher and software architect.
+Analyze the provided code for:
+1. Security vulnerabilities (e.g., SQL injection, XSS, insecure logic).
+2. Architectural patterns that could lead to technical debt.
+3. Compliance with professional coding standards.
+
+Provide a concise, bulleted report with actionable recommendations.
+If no critical issues are found, state 'Analysis complete: No critical flaws detected.'
+"""
 
     def audit_file(self, file_path: Path, content: str) -> str:
-        """Performs a deep audit of a single file."""
-        prompt = f"""
-        You are an expert security researcher and software architect.
-        Analyze the following code from file '{file_path}' for:
-        1. Security vulnerabilities (e.g., SQL injection, XSS, insecure logic).
-        2. Architectural patterns that could lead to technical debt.
-        3. Compliance with professional coding standards.
-
-        Provide a concise, bulleted report with actionable recommendations.
-        If no critical issues are found, state 'Analysis complete: No critical flaws detected.'
-
-        Code Content:
-        ---
-        {content}
-        ---
-        """
         try:
             response = self.client.models.generate_content(
                 model=self.model_id,
-                contents=prompt,
+                contents=f"File: {file_path}\n---\n{content}\n---",
+                config=types.GenerateContentConfig(
+                    system_instruction=self.system_instruction,
+                )
             )
             return response.text or "No response generated."
         except Exception as e:
@@ -40,19 +38,14 @@ class CloudAuditor:
 
     def audit_diff(self, diff_text: str) -> str:
         """Analyzes a git diff for potential impact."""
-        prompt = f"""
-        Analyze the following code change (diff) for potential security regressions or quality drops.
-        Identify if any newly added code introduces risks.
-
-        Diff Content:
-        ---
-        {diff_text}
-        ---
-        """
+        extra_instruction = "Focus heavily on security regressions or newly introduced architectural flaws in this diff."
         try:
             response = self.client.models.generate_content(
                 model=self.model_id,
-                contents=prompt,
+                contents=f"Diff Content:\n---\n{diff_text}\n---",
+                config=types.GenerateContentConfig(
+                    system_instruction=self.system_instruction + "\n\n" + extra_instruction,
+                )
             )
             return response.text or "No response generated."
         except Exception as e:
