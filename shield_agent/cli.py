@@ -1,5 +1,6 @@
 import click
 import os
+import sys
 import json
 from pathlib import Path
 from rich.console import Console
@@ -31,13 +32,13 @@ def scan(dir, ollama, format):
     if format == "json":
         click.echo(json.dumps([i.model_dump() for i in issues], indent=2))
         if issues:
-            os._exit(1)
+            sys.exit(1)
         return
     elif format == "jsonl":
         for issue in issues:
             click.echo(json.dumps(issue.model_dump()))
         if issues:
-            os._exit(1)
+            sys.exit(1)
         return
 
     if not issues:
@@ -64,7 +65,7 @@ def scan(dir, ollama, format):
     console.print(f"\n[bold red]Total issues found: {len(issues)}[/bold red]")
     
     # Exit with code 1 so CI/CD and Git hooks can detect failure
-    os._exit(1)
+    sys.exit(1)
 
 @main.command()
 @click.argument("file", type=click.Path(exists=True))
@@ -107,7 +108,14 @@ echo "🛡️ ShieldAgent-MCP: Scanning for secrets before push..."
 
 # Only scan files that are about to be pushed (heuristic: diff against remote)
 # For simplicity, we scan the whole directory but you could optimize this
-shield-agent scan --dir .
+if command -v uv >/dev/null 2>&1; then
+    uv run shield-agent scan --dir .
+elif command -v shield-agent >/dev/null 2>&1; then
+    shield-agent scan --dir .
+else
+    echo "⚠️  shield-agent not found in PATH or via uv. Skipping scan."
+    exit 0
+fi
 
 if [ $? -ne 0 ]; then
     echo "❌ Push blocked by ShieldAgent-MCP. Fix the security issues listed above before pushing."
