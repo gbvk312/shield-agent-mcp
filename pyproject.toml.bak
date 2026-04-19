@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "shield-agent-mcp"
 version = "0.1.0"
 authors = [
-  { name="gbvk", email="masked@example.com" },
+  { name="gbvk", email="author@example.com" },
 ]
 description = "A Hybrid-AI Security & Quality Sentinel for the MCP Era"
 readme = "README.md"

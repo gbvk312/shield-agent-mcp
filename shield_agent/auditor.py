@@ -24,8 +24,8 @@ If no critical issues are found, state 'Analysis complete: No critical flaws det
 """
 
     def audit_file(self, file_path: Path, content: str) -> str:
-        # Fallback pool for the tool itself
-        models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
+        # Fallback pool for the tool itself - using high-level aliases
+        models = ["gemini-2.0-flash", "gemini-flash-latest", "gemini-pro-latest"]
         
         for model in models:
             try:

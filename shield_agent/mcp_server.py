@@ -65,6 +65,23 @@ if HAS_MCP:
             return f"❌ Error listing directory: {e}"
 
     @mcp.tool()
+    async def read_file(file_path: str) -> str:
+        """
+        Reads the full content of a specified file.
+        
+        Args:
+            file_path: The path to the file to read.
+        """
+        path = Path(file_path)
+        if not path.exists():
+            return f"❌ Error: File {file_path} not found."
+        
+        try:
+            return path.read_text(encoding="utf-8")
+        except Exception as e:
+            return f"❌ Error reading file: {str(e)}"
+
+    @mcp.tool()
     async def audit_file(file_path: str) -> str:
         """Performs a deep Gemini-powered security audit on a specific file."""
         import anyio
