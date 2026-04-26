@@ -47,14 +47,21 @@ If no critical issues are found, state 'Analysis complete: No critical flaws det
     def audit_diff(self, diff_text: str) -> str:
         """Analyzes a git diff for potential impact."""
         extra_instruction = "Focus heavily on security regressions or newly introduced architectural flaws in this diff."
-        try:
-            response = self.client.models.generate_content(
-                model=self.model_id,
-                contents=f"Diff Content:\n---\n{diff_text}\n---",
-                config=types.GenerateContentConfig(
-                    system_instruction=self.system_instruction + "\n\n" + extra_instruction,
+        models = ["gemini-2.0-flash", "gemini-flash-latest", "gemini-pro-latest"]
+        
+        for model in models:
+            try:
+                response = self.client.models.generate_content(
+                    model=model,
+                    contents=f"Diff Content:\n---\n{diff_text}\n---",
+                    config=types.GenerateContentConfig(
+                        system_instruction=self.system_instruction + "\n\n" + extra_instruction,
+                    )
                 )
-            )
-            return response.text or "No response generated."
-        except Exception as e:
-            return f"Error during diff audit: {str(e)}"
+                return response.text or "No response generated."
+            except Exception as e:
+                if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                    continue
+                return f"Error during diff audit: {str(e)}"
+                
+        return "❌ Error: All available models for diff audit are currently rate-limited."

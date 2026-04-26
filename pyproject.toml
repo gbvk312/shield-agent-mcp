@@ -46,3 +46,8 @@ packages = ["shield_agent"]
 dev = [
     "types-requests>=2.33.0.20260408",
 ]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore:.*_UnionGenericAlias.*:DeprecationWarning",
+]

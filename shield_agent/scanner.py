@@ -60,6 +60,7 @@ class LocalScanner:
         "Mailgun API Key": r"key-[0-9a-zA-Z]{32}",
         "SendGrid API Key": r"SG\.[a-zA-Z0-9_-]{22}\.[a-zA-Z0-9_-]{43}",
         "JSON Web Token": r"eyJ[a-zA-Z0-9_-]{10,}\.eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}",
+        "Hugging Face Token": r"hf_[a-zA-Z0-9]{34}",
     }
 
     # Entropy threshold for detecting high-randomness strings (likely secrets)
