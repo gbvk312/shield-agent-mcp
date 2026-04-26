@@ -21,7 +21,7 @@ In an AI-native development world, security must be proactive and context-aware.
 ## 🚀 Key Features
 
 ### 1. Dual-Layer Scanning
-- **Local Layer**: Uses optimized Regex patterns to detect AWS keys, Private Keys, Emails, IP addresses, **Credit Cards, and Phone Numbers**. 
+- **Local Layer**: Uses optimized Regex patterns to detect **AWS keys, OpenAI/Azure/Stripe secrets, GitHub PATs, Slack tokens, Google Cloud Service Accounts, JWTs, Private Keys, Emails, IP addresses, Credit Cards, and Phone Numbers**. 
 - **Verification Layer (Local AI)**: Optional verification via **Ollama** (configurable model) to reduce false positives.
 - **Intelligence Layer (Cloud AI)**: Deep analysis of code logic and security patterns using **Gemini 1.5 Pro**.
 
@@ -29,6 +29,10 @@ In an AI-native development world, security must be proactive and context-aware.
 Exposes standardized tools to your AI agent ecosystem:
 - `scan_for_secrets`: Fast local scan for the current project. Now **asynchronous** and supports custom exclusions.
 - `audit_file`: Deep architectural review of specific files using Gemini.
+- `list_directory`: Explore project structure safely.
+- `read_file`: Access file contents for deep analysis.
+- `safe_write_file`: Remediation tool that applies patches with mandatory security justification and automatic backups.
+- `check_network_exposure`: Audit local machine for risky listening ports and services.
 
 ### 3. Developer Experience
 - **Beautiful CLI**: Powered by `rich` for aesthetic, actionable reports.
