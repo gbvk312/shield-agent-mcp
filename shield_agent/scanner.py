@@ -88,7 +88,7 @@ class LocalScanner:
         """Calculate Shannon entropy of a string."""
         if not data:
             return 0.0
-        freq = {}
+        freq: Dict[str, int] = {}
         for char in data:
             freq[char] = freq.get(char, 0) + 1
         length = len(data)
