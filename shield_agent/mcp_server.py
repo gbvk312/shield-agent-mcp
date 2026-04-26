@@ -158,7 +158,7 @@ if HAS_MCP:
                     check=True
                 )
                 lines = result.stdout.splitlines()
-                listeners = [l for l in lines if "LISTEN" in l]
+                listeners = [line for line in lines if "LISTEN" in line]
                 
                 if not listeners:
                     return "✅ No open listening ports detected."

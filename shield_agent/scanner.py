@@ -1,5 +1,6 @@
 import re
 import os
+import math
 import logging
 from pathlib import Path
 from typing import List, Optional, Dict
@@ -22,7 +23,8 @@ class Issue(BaseModel):
 class LocalScanner:
     """
     LocalSentinel: Privacy-first scanner for PII and Secrets.
-    Uses high-speed regex patterns and optional local LLM verification.
+    Uses high-speed regex patterns, Shannon entropy analysis,
+    and optional local LLM verification.
     """
 
     # Binary file extensions to skip during scanning
@@ -49,7 +51,20 @@ class LocalScanner:
         "IPv4 Address": r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
         "Credit Card": r"\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|3(?:0[0-5]|[68][0-9])[0-9]{11}|6(?:011|5[0-9]{2})[0-9]{12}|(?:2131|1800|35\d{3})\d{11})\b",
         "Phone Number": r"\b(?:\+?(\d{1,3}))?[-. (]*(\d{3})[-. )]*(\d{3})[-. ]*(\d{4})\b",
+        # Modern cloud provider patterns
+        "OpenAI API Key": r"sk-[a-zA-Z0-9]{20}T3BlbkFJ[a-zA-Z0-9]{20}",
+        "Slack Bot Token": r"xoxb-[0-9]{11,13}-[0-9]{11,13}-[a-zA-Z0-9]{24}",
+        "Slack Webhook URL": r"https://hooks\.slack\.com/services/T[a-zA-Z0-9_]{8,}/B[a-zA-Z0-9_]{8,}/[a-zA-Z0-9_]{24}",
+        "Google Cloud Service Account": r"\"type\":\s*\"service_account\"",
+        "Twilio API Key": r"SK[0-9a-fA-F]{32}",
+        "Mailgun API Key": r"key-[0-9a-zA-Z]{32}",
+        "SendGrid API Key": r"SG\.[a-zA-Z0-9_-]{22}\.[a-zA-Z0-9_-]{43}",
+        "JSON Web Token": r"eyJ[a-zA-Z0-9_-]{10,}\.eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}",
     }
+
+    # Entropy threshold for detecting high-randomness strings (likely secrets)
+    ENTROPY_THRESHOLD = 4.5
+    ENTROPY_MIN_LENGTH = 20
 
     def __init__(self, root_path: str):
         self.root_path = Path(root_path)
@@ -68,11 +83,35 @@ class LocalScanner:
             return self.gitignore.match_file(relative_path)
         return False
 
+    @staticmethod
+    def _shannon_entropy(data: str) -> float:
+        """Calculate Shannon entropy of a string."""
+        if not data:
+            return 0.0
+        freq = {}
+        for char in data:
+            freq[char] = freq.get(char, 0) + 1
+        length = len(data)
+        return -sum((count / length) * math.log2(count / length) for count in freq.values())
+
+    def _detect_high_entropy_strings(self, line: str) -> List[str]:
+        """Extract tokens from assignment-like patterns and check their entropy."""
+        hits = []
+        # Match quoted strings in assignments: key = "value" or key: "value"
+        for match in re.finditer(r"""(?:=|:)\s*['"]([a-zA-Z0-9+/=_\-]{20,})['"]""", line):
+            token = match.group(1)
+            if len(token) >= self.ENTROPY_MIN_LENGTH and self._shannon_entropy(token) >= self.ENTROPY_THRESHOLD:
+                # Skip known false positive patterns
+                if not self._is_likely_false_positive(token):
+                    hits.append(token)
+        return hits
+
     def scan_file(self, file_path: Path) -> List[Issue]:
         issues = []
         try:
             with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                 for line_num, line in enumerate(f, 1):
+                    # Regex-based pattern matching
                     for name, pattern in self.PATTERNS.items():
                         matches = re.finditer(pattern, line, re.IGNORECASE)
                         for match in matches:
@@ -88,6 +127,17 @@ class LocalScanner:
                                 content=match.group(0).strip(),
                                 description=f"Potential {name} detected."
                             ))
+
+                    # Entropy-based detection for strings not caught by regex
+                    for token in self._detect_high_entropy_strings(line):
+                        issues.append(Issue(
+                            file_path=str(file_path.relative_to(self.root_path)),
+                            line_number=line_num,
+                            rule_name="High Entropy String",
+                            severity="MEDIUM",
+                            content=token[:60] + "..." if len(token) > 60 else token,
+                            description="High-entropy string detected — possible embedded secret or key."
+                        ))
         except Exception as e:
             logger.error(f"Error scanning file {file_path}: {e}")
         return issues
