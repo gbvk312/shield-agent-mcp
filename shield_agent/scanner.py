@@ -3,9 +3,10 @@ import os
 import math
 import logging
 from pathlib import Path
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Pattern
 from pydantic import BaseModel
 from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import urlparse
 import pathspec
 
 # Configure logging
@@ -48,7 +49,7 @@ class LocalScanner:
         "Stripe Secret Key": r"sk_(?:test|live)_[0-9a-zA-Z]{24,}",
         "GitHub Personal Access Token": r"ghp_[a-zA-Z0-9]{36}",
         "Private Key": r"-----BEGIN (?:RSA|OPENSSH|PRIVATE) KEY-----",
-        "IPv4 Address": r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
+        "IPv4 Address": r"(?<![a-zA-Z0-9>=v.])\b(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\b(?![.\d])",
         "Credit Card": r"\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|3(?:0[0-5]|[68][0-9])[0-9]{11}|6(?:011|5[0-9]{2})[0-9]{12}|(?:2131|1800|35\d{3})\d{11})\b",
         "Phone Number": r"\b(?:\+?(\d{1,3}))?[-. (]*(\d{3})[-. )]*(\d{3})[-. ]*(\d{4})\b",
         # Modern cloud provider patterns
@@ -70,6 +71,11 @@ class LocalScanner:
     def __init__(self, root_path: str):
         self.root_path = Path(root_path)
         self.gitignore = self._load_gitignore()
+        # Pre-compile all regex patterns for performance
+        self._compiled_patterns: Dict[str, Pattern[str]] = {
+            name: re.compile(pattern, re.IGNORECASE)
+            for name, pattern in self.PATTERNS.items()
+        }
 
     def _load_gitignore(self) -> Optional[pathspec.PathSpec]:
         gitignore_path = self.root_path / ".gitignore"
@@ -112,9 +118,9 @@ class LocalScanner:
         try:
             with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                 for line_num, line in enumerate(f, 1):
-                    # Regex-based pattern matching
-                    for name, pattern in self.PATTERNS.items():
-                        matches = re.finditer(pattern, line, re.IGNORECASE)
+                    # Regex-based pattern matching (using pre-compiled patterns)
+                    for name, compiled in self._compiled_patterns.items():
+                        matches = compiled.finditer(line)
                         for match in matches:
                             # Basic heuristic to avoid false positives for Generic API Key
                             if name == "Generic API Key" and self._is_likely_false_positive(match.group(1)):
@@ -171,6 +177,16 @@ class LocalScanner:
         import requests
         ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
         ollama_model = os.getenv("OLLAMA_MODEL", "gemma2")
+
+        # Warn if Ollama host is not localhost — secrets would be sent over the network
+        parsed = urlparse(ollama_host)
+        hostname = parsed.hostname or ""
+        if hostname not in ("localhost", "127.0.0.1", "::1"):
+            logger.warning(
+                f"OLLAMA_HOST ({ollama_host}) is a remote host. "
+                "Secret content will be sent over the network for verification."
+            )
+
         try:
             prompt = f"Identify if the following string is likely a real sensitive API key or secret password. Respond with only 'YES' or 'NO'.\nString: {issue.content}"
             response = requests.post(

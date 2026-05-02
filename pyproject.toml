@@ -29,13 +29,6 @@ dependencies = [
     "anyio>=4.0.0",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "ruff>=0.4.0",
-    "mypy>=1.10.0",
-    "pytest>=8.0.0",
-]
-
 [project.scripts]
 shield-agent = "shield_agent.cli:main"
 
@@ -44,6 +37,9 @@ packages = ["shield_agent"]
 
 [dependency-groups]
 dev = [
+    "ruff>=0.4.0",
+    "mypy>=1.10.0",
+    "pytest>=8.0.0",
     "types-requests>=2.33.0.20260408",
 ]
 

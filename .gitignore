@@ -23,7 +23,7 @@ htmlcov/
 .ruff_cache/
 
 # OS
-.DS_Store
+**/.DS_Store
 Thumbs.db
 
 # IDE
@@ -33,3 +33,4 @@ Thumbs.db
 # Project Specific
 scratch/
 tests/test_secret.py
+*.bak

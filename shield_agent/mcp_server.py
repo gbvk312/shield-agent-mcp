@@ -1,7 +1,11 @@
 import os
+import shutil
 from pathlib import Path
 from .scanner import LocalScanner
 from .auditor import CloudAuditor
+
+# Maximum file size for read/audit operations (10 MB)
+MAX_FILE_SIZE = 10 * 1024 * 1024
 
 try:
     from mcp.server.fastmcp import FastMCP
@@ -77,6 +81,9 @@ if HAS_MCP:
             return f"❌ Error: File {file_path} not found."
         
         try:
+            file_size = path.stat().st_size
+            if file_size > MAX_FILE_SIZE:
+                return f"❌ File too large ({file_size:,} bytes). Max: {MAX_FILE_SIZE:,} bytes."
             return path.read_text(encoding="utf-8")
         except Exception as e:
             return f"❌ Error reading file: {str(e)}"
@@ -93,6 +100,10 @@ if HAS_MCP:
         path = Path(file_path)
         if not path.exists():
             return f"❌ Error: File {file_path} not found."
+
+        file_size = path.stat().st_size
+        if file_size > MAX_FILE_SIZE:
+            return f"❌ File too large ({file_size:,} bytes). Max: {MAX_FILE_SIZE:,} bytes."
             
         def run_audit():
             auditor = CloudAuditor(api_key)
@@ -115,18 +126,25 @@ if HAS_MCP:
         """
         import anyio
         
-        path = Path(file_path)
+        path = Path(file_path).resolve()
         
         def do_write():
-            # Basic safety: don't write to sensitive system paths (simulated)
+            # Path traversal protection: reject paths with '..' segments
+            try:
+                path.relative_to(Path.cwd().resolve())
+            except ValueError:
+                return f"❌ Error: Path '{file_path}' is outside the working directory. Write rejected."
+
+            # Safety: don't write to sensitive files
             base_name = path.name.lower()
-            if base_name in (".env", "id_rsa", ".ssh"):
-                 return f"⚠️ Warning: Direct write to {base_name} is restricted. Use specialized tools for secrets."
+            sensitive_names = {".env", "id_rsa", ".ssh", ".env.production", ".env.local"}
+            if base_name in sensitive_names or base_name.startswith(".env"):
+                return f"⚠️ Warning: Direct write to {base_name} is restricted. Use specialized tools for secrets."
             
-            # Create backup if exists
+            # Create backup if exists (copy, not move, so original survives a failed write)
             if path.exists():
                 backup = path.with_suffix(path.suffix + ".bak")
-                path.replace(backup)
+                shutil.copy2(path, backup)
                 backup_msg = f" (Backup created at {backup.name})"
             else:
                 backup_msg = ""

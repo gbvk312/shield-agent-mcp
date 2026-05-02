@@ -110,14 +110,16 @@ echo "🛡️ ShieldAgent-MCP: Scanning for secrets before push..."
 # For simplicity, we scan the whole directory but you could optimize this
 if command -v uv >/dev/null 2>&1; then
     uv run shield-agent scan --dir .
+    SCAN_EXIT=$?
 elif command -v shield-agent >/dev/null 2>&1; then
     shield-agent scan --dir .
+    SCAN_EXIT=$?
 else
     echo "⚠️  shield-agent not found in PATH or via uv. Skipping scan."
     exit 0
 fi
 
-if [ $? -ne 0 ]; then
+if [ "$SCAN_EXIT" -ne 0 ]; then
     echo "❌ Push blocked by ShieldAgent-MCP. Fix the security issues listed above before pushing."
     exit 1
 fi

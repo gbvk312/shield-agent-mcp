@@ -12,7 +12,7 @@
 In an AI-native development world, security must be proactive and context-aware. ShieldAgent-MCP provides:
 
 - **Local Sentinel (Privacy-First)**: High-speed scanning for API keys and PII that never leaves your machine.
-- **Cloud Auditor (Deep Intelligence)**: Advanced architectural reviews and logic flaw detection powered by **Google Gemini 1.5 Pro**.
+- **Cloud Auditor (Deep Intelligence)**: Advanced architectural reviews and logic flaw detection powered by **Google Gemini 2.0 Flash**.
 - **MCP Native**: Seamlessly integrates with AI assistants like Claude, Cursor, and ChatGPT.
 - **Automated Gating**: Simple Git hooks to prevent security regressions before they are pushed.
 
@@ -23,7 +23,7 @@ In an AI-native development world, security must be proactive and context-aware.
 ### 1. Dual-Layer Scanning
 - **Local Layer**: Uses optimized Regex patterns to detect **AWS keys, OpenAI/Azure/Stripe secrets, GitHub PATs, Slack tokens, Google Cloud Service Accounts, JWTs, Private Keys, Emails, IP addresses, Credit Cards, and Phone Numbers**. 
 - **Verification Layer (Local AI)**: Optional verification via **Ollama** (configurable model) to reduce false positives.
-- **Intelligence Layer (Cloud AI)**: Deep analysis of code logic and security patterns using **Gemini 1.5 Pro**.
+- **Intelligence Layer (Cloud AI)**: Deep analysis of code logic and security patterns using **Gemini 2.0 Flash**.
 
 ### 2. Model Context Protocol (MCP) Integration
 Exposes standardized tools to your AI agent ecosystem:

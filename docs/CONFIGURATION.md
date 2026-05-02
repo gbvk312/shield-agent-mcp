@@ -10,10 +10,11 @@ The easiest way to configure ShieldAgent-MCP is via a `.env` file in your projec
 |----------|-------------|----------|---------|
 | `GEMINI_API_KEY` | Your Google AI Studio API Key | Yes (for `audit`) | None |
 | `OLLAMA_HOST` | URL for your local Ollama instance | No (for `scan --ollama`) | `http://localhost:11434` |
+| `OLLAMA_MODEL` | Name of the Ollama model to use for verification | No (for `scan --ollama`) | `gemma2` |
 
 ### Setting up the Gemini API Key
 1. Go to [Google AI Studio](https://aistudio.google.com/).
-2. Generate a new API Key for **Gemini 1.5 Pro**.
+2. Generate a new API Key for **Gemini 2.0 Flash**.
 3. Add it to your `.env` file:
    ```env
    GEMINI_API_KEY=your_key_here
@@ -71,6 +72,6 @@ Add this to your `claude_desktop_config.json`:
 
 ## 4. Troubleshooting
 
-- **Gemini Errors**: Ensure your API key has "Gemini 1.5 Pro" access. Paid and free tier keys both work, but free tier is subject to rate limits.
+- **Gemini Errors**: Ensure your API key has "Gemini 2.0 Flash" access. Paid and free tier keys both work, but free tier is subject to rate limits.
 - **Ollama Connection**: If Ollama is running on a different port or machine, ensure `OLLAMA_HOST` is set correctly.
 - **Python Version**: MCP features require **Python 3.10+**.
