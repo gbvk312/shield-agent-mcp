@@ -111,13 +111,27 @@ class LocalScanner:
     def __init__(self, root_path: str):
         self.root_path = Path(root_path)
         self.gitignore = self._load_gitignore()
+        
+        # Load custom rules from config
+        self._patterns = dict(self.PATTERNS)
+        self._severity_map = dict(self.SEVERITY_MAP)
+        
+        custom_rules = config.get_custom_rules()
+        for rule in custom_rules:
+            name = rule.get("name")
+            pattern = rule.get("pattern")
+            severity = rule.get("severity", "MEDIUM")
+            if name and pattern:
+                self._patterns[name] = pattern
+                self._severity_map[name] = severity
+
         # Pre-compile all regex patterns for performance
         self._compiled_patterns: dict[str, re.Pattern[str]] = {
             name: re.compile(
                 pattern,
                 re.IGNORECASE if name in self.CASE_INSENSITIVE_PATTERNS else 0,
             )
-            for name, pattern in self.PATTERNS.items()
+            for name, pattern in self._patterns.items()
         }
 
     def _load_gitignore(self) -> pathspec.PathSpec | None:
@@ -135,7 +149,7 @@ class LocalScanner:
 
     def _get_severity(self, rule_name: str) -> str:
         """Return the severity for a given rule, falling back to MEDIUM."""
-        return self.SEVERITY_MAP.get(rule_name, "MEDIUM")
+        return self._severity_map.get(rule_name, "MEDIUM")
 
     @staticmethod
     def _shannon_entropy(data: str) -> float:

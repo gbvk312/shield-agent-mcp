@@ -201,6 +201,39 @@ if HAS_MCP:
         return await anyio.to_thread.run_sync(do_write)
 
     @mcp.tool()
+    async def restore_backup(file_path: str) -> str:
+        """
+        Restores a file from its .bak backup.
+        Used to rollback a flawed remediation.
+        
+        Args:
+            file_path: The original path to the file to restore.
+        """
+        import anyio
+        
+        path = Path(file_path).resolve()
+        
+        def do_restore() -> str:
+            # Path traversal protection
+            try:
+                path.relative_to(_SERVER_ROOT)
+            except ValueError:
+                return f"❌ Error: Path '{file_path}' is outside the working directory."
+
+            backup_path = path.with_suffix(path.suffix + ".bak")
+            if not backup_path.exists():
+                return f"❌ Error: No backup found at {backup_path.name}"
+            
+            try:
+                shutil.copy2(backup_path, path)
+                backup_path.unlink()  # Clean up the backup after restoration
+                return f"✅ Successfully restored {file_path} from backup and cleaned up."
+            except Exception as e:
+                return f"❌ Error restoring backup: {str(e)}"
+
+        return await anyio.to_thread.run_sync(do_restore)
+
+    @mcp.tool()
     async def check_network_exposure() -> str:
         """
         Checks for risky network listening ports on the local machine.
@@ -232,7 +265,13 @@ if HAS_MCP:
                 
                 report = "🔍 Found the following listening services:\n"
                 for listener in listeners:
-                    report += f"- {listener}\n"
+                    # Check if port is bound to localhost vs all interfaces
+                    if "127.0.0.1" in listener or "[::1]" in listener or "localhost" in listener:
+                        report += f"  - [Safe/Local] {listener.strip()}\n"
+                    elif "0.0.0.0" in listener or "[::]" in listener or "*:" in listener:
+                        report += f"  - [⚠️ Exposed/External] {listener.strip()}\n"
+                    else:
+                        report += f"  - [?] {listener.strip()}\n"
                 return report
             except Exception as e:
                 return f"❌ Error checking network: {e}"

@@ -1,0 +1,22 @@
+# ShieldAgent-MCP Configuration
+
+# Directories to exclude from scanning
+exclude_dirs:
+  - ".git"
+  - "__pycache__"
+  - "venv"
+  - ".venv"
+  - "node_modules"
+  - "scratch"
+  - ".pytest_cache"
+  - ".ruff_cache"
+  - ".mypy_cache"
+
+# Custom regex rules for your organization
+custom_rules:
+  - name: "Company Internal Token"
+    pattern: "CORP-[A-Z0-9]{16}"
+    severity: "HIGH"
+  - name: "Development Environment Flag"
+    pattern: "DEV_MODE=(true|1)"
+    severity: "LOW"
