@@ -32,13 +32,47 @@ class LocalScanner:
 
     # Binary file extensions to skip during scanning
     BINARY_EXTENSIONS = {
-        ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".svg", ".webp",
-        ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
-        ".zip", ".tar", ".gz", ".bz2", ".7z", ".rar",
-        ".exe", ".dll", ".so", ".dylib", ".bin",
-        ".mp3", ".mp4", ".avi", ".mov", ".wav", ".flac",
-        ".woff", ".woff2", ".ttf", ".otf", ".eot",
-        ".pyc", ".pyo", ".class", ".o",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".bmp",
+        ".ico",
+        ".svg",
+        ".webp",
+        ".pdf",
+        ".doc",
+        ".docx",
+        ".xls",
+        ".xlsx",
+        ".ppt",
+        ".pptx",
+        ".zip",
+        ".tar",
+        ".gz",
+        ".bz2",
+        ".7z",
+        ".rar",
+        ".exe",
+        ".dll",
+        ".so",
+        ".dylib",
+        ".bin",
+        ".mp3",
+        ".mp4",
+        ".avi",
+        ".mov",
+        ".wav",
+        ".flac",
+        ".woff",
+        ".woff2",
+        ".ttf",
+        ".otf",
+        ".eot",
+        ".pyc",
+        ".pyo",
+        ".class",
+        ".o",
     }
 
     # Common Patterns (Secrets & PII)
@@ -98,11 +132,16 @@ class LocalScanner:
     }
 
     # Pre-computed lowercase placeholder set to avoid rebuilding per call
-    _PLACEHOLDER_VALUES: frozenset[str] = frozenset({
-        "your_api_key", "example_token", "secret_key_here",
-        "your_google_gemini_api_key_here", "your_gemini_api_key_here",
-        "your_api_key_here",
-    })
+    _PLACEHOLDER_VALUES: frozenset[str] = frozenset(
+        {
+            "your_api_key",
+            "example_token",
+            "secret_key_here",
+            "your_google_gemini_api_key_here",
+            "your_gemini_api_key_here",
+            "your_api_key_here",
+        }
+    )
 
     # Entropy threshold for detecting high-randomness strings (likely secrets)
     ENTROPY_THRESHOLD = 4.5
@@ -111,11 +150,11 @@ class LocalScanner:
     def __init__(self, root_path: str):
         self.root_path = Path(root_path)
         self.gitignore = self._load_gitignore()
-        
+
         # Load custom rules from config
         self._patterns = dict(self.PATTERNS)
         self._severity_map = dict(self.SEVERITY_MAP)
-        
+
         custom_rules = config.get_custom_rules()
         for rule in custom_rules:
             name = rule.get("name")
@@ -160,10 +199,7 @@ class LocalScanner:
         for char in data:
             freq[char] = freq.get(char, 0) + 1
         length = len(data)
-        return -sum(
-            (count / length) * math.log2(count / length)
-            for count in freq.values()
-        )
+        return -sum((count / length) * math.log2(count / length) for count in freq.values())
 
     def _detect_high_entropy_strings(self, line: str) -> list[str]:
         """Extract tokens from assignment-like patterns and check their entropy."""
@@ -190,25 +226,29 @@ class LocalScanner:
                             if name == "Generic API Key" and self._is_likely_false_positive(match.group(1)):
                                 continue
 
-                            issues.append(Issue(
-                                file_path=str(file_path.relative_to(self.root_path)),
-                                line_number=line_num,
-                                rule_name=name,
-                                severity=self._get_severity(name),
-                                content=match.group(0).strip(),
-                                description=f"Potential {name} detected.",
-                            ))
+                            issues.append(
+                                Issue(
+                                    file_path=str(file_path.relative_to(self.root_path)),
+                                    line_number=line_num,
+                                    rule_name=name,
+                                    severity=self._get_severity(name),
+                                    content=match.group(0).strip(),
+                                    description=f"Potential {name} detected.",
+                                )
+                            )
 
                     # Entropy-based detection for strings not caught by regex
                     for token in self._detect_high_entropy_strings(line):
-                        issues.append(Issue(
-                            file_path=str(file_path.relative_to(self.root_path)),
-                            line_number=line_num,
-                            rule_name="High Entropy String",
-                            severity="MEDIUM",
-                            content=token[:60] + "..." if len(token) > 60 else token,
-                            description="High-entropy string detected — possible embedded secret or key.",
-                        ))
+                        issues.append(
+                            Issue(
+                                file_path=str(file_path.relative_to(self.root_path)),
+                                line_number=line_num,
+                                rule_name="High Entropy String",
+                                severity="MEDIUM",
+                                content=token[:60] + "..." if len(token) > 60 else token,
+                                description="High-entropy string detected — possible embedded secret or key.",
+                            )
+                        )
         except Exception as e:
             logger.error(f"Error scanning file {file_path}: {e}")
         return issues

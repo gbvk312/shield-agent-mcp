@@ -6,6 +6,7 @@ from shield_agent.scanner import LocalScanner
 
 # --- Shannon Entropy Tests ---
 
+
 class TestShannonEntropy:
     def test_empty_string(self):
         assert LocalScanner._shannon_entropy("") == 0.0
@@ -30,6 +31,7 @@ class TestShannonEntropy:
 
 
 # --- Entropy-Based Detection Tests ---
+
 
 class TestHighEntropyDetection:
     def test_detects_high_entropy_in_assignment(self, tmp_path):
@@ -63,6 +65,7 @@ class TestHighEntropyDetection:
 
 # --- Gitignore Integration Tests ---
 
+
 class TestGitignoreIntegration:
     def test_respects_gitignore(self, tmp_path):
         # Create a .gitignore that ignores secret files
@@ -93,6 +96,7 @@ class TestGitignoreIntegration:
 
 
 # --- Case-Sensitivity Tests ---
+
 
 class TestCaseSensitivity:
     def test_aws_key_case_sensitive(self, tmp_path):
@@ -137,6 +141,7 @@ class TestCaseSensitivity:
 
 # --- False Positive Filtering Tests ---
 
+
 class TestFalsePositiveFiltering:
     def test_placeholder_filtered(self):
         scanner = LocalScanner(".")
@@ -164,6 +169,7 @@ class TestFalsePositiveFiltering:
 
 
 # --- Severity Map Tests ---
+
 
 class TestSeverityMap:
     def test_aws_key_is_high(self, tmp_path):
@@ -200,6 +206,7 @@ class TestSeverityMap:
 
 # --- Binary File Skipping Tests ---
 
+
 class TestBinaryFileSkipping:
     def test_skips_binary_extensions(self, tmp_path):
         (tmp_path / "image.png").write_bytes(b"AKIA1234567890ABCDEF")
@@ -211,6 +218,7 @@ class TestBinaryFileSkipping:
 
 
 # --- Ollama Verification Tests ---
+
 
 class TestOllamaVerification:
     def test_verify_with_ollama_yes(self):
@@ -227,10 +235,14 @@ class TestOllamaVerification:
             description="Potential AWS Access Key detected.",
         )
 
-        mock_response = type("Response", (), {
-            "status_code": 200,
-            "json": lambda self: {"response": "YES"},
-        })()
+        mock_response = type(
+            "Response",
+            (),
+            {
+                "status_code": 200,
+                "json": lambda self: {"response": "YES"},
+            },
+        )()
 
         with patch("requests.post", return_value=mock_response):
             assert scanner.verify_with_ollama(issue) is True
@@ -249,10 +261,14 @@ class TestOllamaVerification:
             description="Potential Email Address detected.",
         )
 
-        mock_response = type("Response", (), {
-            "status_code": 200,
-            "json": lambda self: {"response": "NO"},
-        })()
+        mock_response = type(
+            "Response",
+            (),
+            {
+                "status_code": 200,
+                "json": lambda self: {"response": "NO"},
+            },
+        )()
 
         with patch("requests.post", return_value=mock_response):
             assert scanner.verify_with_ollama(issue) is False

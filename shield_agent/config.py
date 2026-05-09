@@ -27,6 +27,7 @@ class Config:
                         cls._yaml_config = data
             except Exception as e:
                 import logging
+
                 logging.getLogger("shield_agent.config").warning(f"Failed to load shield-agent.yaml: {e}")
 
     @property
@@ -51,5 +52,6 @@ class Config:
     def get_custom_rules() -> list[dict[str, str]]:
         rules = Config._yaml_config.get("custom_rules", [])
         return rules if isinstance(rules, list) else []
+
 
 config = Config()

@@ -30,9 +30,7 @@ Provide a concise, bulleted report with actionable recommendations.
 If no critical issues are found, state 'Analysis complete: No critical flaws detected.'
 """
 
-    def _call_with_fallback(
-        self, contents: str, extra_instruction: str = "", error_prefix: str = "audit"
-    ) -> str:
+    def _call_with_fallback(self, contents: str, extra_instruction: str = "", error_prefix: str = "audit") -> str:
         """Shared model-fallback logic for all Gemini-powered analysis."""
         system = self.system_instruction
         if extra_instruction:
@@ -45,7 +43,7 @@ If no critical issues are found, state 'Analysis complete: No critical flaws det
                     contents=contents,
                     config=types.GenerateContentConfig(
                         system_instruction=system,
-                    )
+                    ),
                 )
                 return response.text or "No response generated."
             except Exception as e:
@@ -68,8 +66,7 @@ If no critical issues are found, state 'Analysis complete: No critical flaws det
         return self._call_with_fallback(
             contents=f"Diff Content:\n---\n{diff_text}\n---",
             extra_instruction=(
-                "Focus heavily on security regressions or newly "
-                "introduced architectural flaws in this diff."
+                "Focus heavily on security regressions or newly introduced architectural flaws in this diff."
             ),
             error_prefix="diff audit",
         )

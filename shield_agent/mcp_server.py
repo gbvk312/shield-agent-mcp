@@ -19,6 +19,7 @@ _SERVER_ROOT = Path.cwd().resolve()
 
 try:
     from mcp.server.fastmcp import FastMCP
+
     HAS_MCP = True
 except ImportError:
     HAS_MCP = False
@@ -47,13 +48,13 @@ if HAS_MCP:
     async def scan_for_secrets(directory: str = ".", use_ollama: bool = False) -> str:
         """
         Scans specified directory for sensitive data leaks (PII, Secrets).
-        
+
         Args:
             directory: The path to the directory to scan.
             use_ollama: Whether to use local Ollama for verification (requires OLLAMA_HOST).
         """
         import anyio
-        
+
         path = Path(directory).resolve()
         error = _validate_path(path)
         if error:
@@ -68,10 +69,7 @@ if HAS_MCP:
 
             report = "🚨 Detected Security Issues:\n"
             for issue in issues:
-                report += (
-                    f"- {issue.file_path}:{issue.line_number} "
-                    f"[{issue.rule_name}] ({issue.severity})\n"
-                )
+                report += f"- {issue.file_path}:{issue.line_number} [{issue.rule_name}] ({issue.severity})\n"
             return report
 
         return await anyio.to_thread.run_sync(run_scan)
@@ -80,7 +78,7 @@ if HAS_MCP:
     async def list_directory(directory: str = ".") -> str:
         """
         Lists files and directories in the specified path.
-        
+
         Args:
             directory: The path to the directory to list.
         """
@@ -88,12 +86,12 @@ if HAS_MCP:
         error = _validate_path(path)
         if error:
             return error
-        
+
         try:
             items = os.listdir(path)
             if not items:
                 return f"📁 Directory {directory} is empty."
-            
+
             output = f"📁 Contents of {directory}:\n"
             for item in sorted(items):
                 is_dir = (path / item).is_dir()
@@ -107,7 +105,7 @@ if HAS_MCP:
     async def read_file(file_path: str) -> str:
         """
         Reads the full content of a specified file.
-        
+
         Args:
             file_path: The path to the file to read.
         """
@@ -115,7 +113,7 @@ if HAS_MCP:
         error = _validate_path(path)
         if error:
             return error
-        
+
         try:
             file_size = path.stat().st_size
             if file_size > MAX_FILE_SIZE:
@@ -128,11 +126,11 @@ if HAS_MCP:
     async def audit_file(file_path: str) -> str:
         """Performs a deep Gemini-powered security audit on a specific file."""
         import anyio
-        
+
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             return "❌ Error: GEMINI_API_KEY not configured."
-        
+
         path = Path(file_path).resolve()
         error = _validate_path(path)
         if error:
@@ -141,13 +139,13 @@ if HAS_MCP:
         file_size = path.stat().st_size
         if file_size > MAX_FILE_SIZE:
             return f"❌ File too large ({file_size:,} bytes). Max: {MAX_FILE_SIZE:,} bytes."
-            
+
         def run_audit() -> str:
             auditor = CloudAuditor(api_key)
             with open(path, encoding="utf-8") as f:
                 content = f.read()
             return auditor.audit_file(path, content)
-            
+
         return await anyio.to_thread.run_sync(run_audit)
 
     @mcp.tool()
@@ -155,35 +153,29 @@ if HAS_MCP:
         """
         Safely writes or updates a file with a mandatory justification.
         Used by remediation agents to fix security vulnerabilities.
-        
+
         Args:
             file_path: The path to the file to write.
             content: The new content for the file.
             reason: The security justification for this change.
         """
         import anyio
-        
+
         path = Path(file_path).resolve()
-        
+
         def do_write() -> str:
             # Path traversal protection: reject paths outside server root
             try:
                 path.relative_to(_SERVER_ROOT)
             except ValueError:
-                return (
-                    f"❌ Error: Path '{file_path}' is outside the "
-                    "working directory. Write rejected."
-                )
+                return f"❌ Error: Path '{file_path}' is outside the working directory. Write rejected."
 
             # Safety: don't write to sensitive files
             base_name = path.name.lower()
             sensitive_names = {".env", "id_rsa", ".ssh", ".env.production", ".env.local"}
             if base_name in sensitive_names or base_name.startswith(".env"):
-                return (
-                    f"⚠️ Warning: Direct write to {base_name} is restricted. "
-                    "Use specialized tools for secrets."
-                )
-            
+                return f"⚠️ Warning: Direct write to {base_name} is restricted. Use specialized tools for secrets."
+
             # Create backup if exists (copy, not move, so original survives a failed write)
             if path.exists():
                 backup = path.with_suffix(path.suffix + ".bak")
@@ -195,7 +187,7 @@ if HAS_MCP:
             path.parent.mkdir(parents=True, exist_ok=True)
             with open(path, "w", encoding="utf-8") as f:
                 f.write(content)
-            
+
             return f"✅ Successfully wrote {file_path}. Reason: {reason}{backup_msg}"
 
         return await anyio.to_thread.run_sync(do_write)
@@ -205,14 +197,14 @@ if HAS_MCP:
         """
         Restores a file from its .bak backup.
         Used to rollback a flawed remediation.
-        
+
         Args:
             file_path: The original path to the file to restore.
         """
         import anyio
-        
+
         path = Path(file_path).resolve()
-        
+
         def do_restore() -> str:
             # Path traversal protection
             try:
@@ -223,7 +215,7 @@ if HAS_MCP:
             backup_path = path.with_suffix(path.suffix + ".bak")
             if not backup_path.exists():
                 return f"❌ Error: No backup found at {backup_path.name}"
-            
+
             try:
                 shutil.copy2(backup_path, path)
                 backup_path.unlink()  # Clean up the backup after restoration
@@ -246,23 +238,24 @@ if HAS_MCP:
         def run_check() -> str:
             try:
                 import platform
+
                 # Use platform-appropriate command
                 if platform.system() == "Windows":
                     cmd = ["netstat", "-an"]
                 else:
                     cmd = ["lsof", "-i", "-P", "-n"]
                 result = subprocess.run(
-                    cmd, 
-                    capture_output=True, 
-                    text=True, 
+                    cmd,
+                    capture_output=True,
+                    text=True,
                     check=True,
                 )
                 lines = result.stdout.splitlines()
                 listeners = [line for line in lines if "LISTEN" in line]
-                
+
                 if not listeners:
                     return "✅ No open listening ports detected."
-                
+
                 report = "🔍 Found the following listening services:\n"
                 for listener in listeners:
                     # Check if port is bound to localhost vs all interfaces
@@ -279,9 +272,11 @@ if HAS_MCP:
         return await anyio.to_thread.run_sync(run_check)
 
 else:
+
     def main() -> None:
         print("MCP Server functionality requires the 'mcp' library and Python 3.10+.")
         print("Install it using: pip install shield-agent-mcp")
+
 
 if __name__ == "__main__":
     if HAS_MCP:
