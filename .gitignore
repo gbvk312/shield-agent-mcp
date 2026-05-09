@@ -33,3 +33,4 @@ Thumbs.db
 # Project Specific
 scratch/
 *.bak
+.python-version

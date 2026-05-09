@@ -1,6 +1,9 @@
 # ShieldAgent-MCP 🛡️🤖
 ### *The Hybrid-AI Security & Quality Sentinel for the MCP Era*
 
+[![CI](https://github.com/gbvk312/shield-agent-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/gbvk312/shield-agent-mcp/actions/workflows/ci.yml)
+[![Security Scan](https://github.com/gbvk312/shield-agent-mcp/actions/workflows/security_scan.yml/badge.svg)](https://github.com/gbvk312/shield-agent-mcp/actions/workflows/security_scan.yml)
+
 ![ShieldAgent-MCP Logo](docs/logo.png)
 
 **ShieldAgent-MCP** is a cutting-edge security and code quality auditor designed for modern developer workflows. It combines the speed of local scanning with the intelligence of high-end LLMs to protect your codebase from PII leaks, secrets exposure, and architectural vulnerabilities.
