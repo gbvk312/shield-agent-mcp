@@ -1,6 +1,5 @@
-import pytest
-from shield_agent.scanner import LocalScanner, Issue
-from pathlib import Path
+from shield_agent.scanner import LocalScanner
+
 
 def test_secret_detection(tmp_path):
     # Create a dummy file with a secret

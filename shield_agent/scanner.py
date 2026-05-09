@@ -1,18 +1,18 @@
-import re
-import os
-import math
 import logging
-from pathlib import Path
-from re import Pattern
-
-from pydantic import BaseModel
+import math
+import re
 from concurrent.futures import ThreadPoolExecutor
-from urllib.parse import urlparse
+from pathlib import Path
+
 import pathspec
+from pydantic import BaseModel
 
 from .config import config
 
+__all__ = ["Issue", "LocalScanner"]
+
 logger = logging.getLogger("shield_agent.scanner")
+
 
 class Issue(BaseModel):
     file_path: str
@@ -21,6 +21,7 @@ class Issue(BaseModel):
     severity: str
     content: str
     description: str
+
 
 class LocalScanner:
     """
@@ -40,23 +41,22 @@ class LocalScanner:
         ".pyc", ".pyo", ".class", ".o",
     }
 
-    
     # Common Patterns (Secrets & PII)
     PATTERNS: dict[str, str] = {
-        "Email Address": r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",
-        "Generic API Key": r"(?i)(?:key|api|token|secret|password|auth)(?:[\s|'|\"]*)[:|=](?:[\s|'|\"]*)([a-z0-9\-_]{16,})",
+        "Email Address": r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",  # noqa: E501
+        "Generic API Key": r"(?i)(?:key|api|token|secret|password|auth)(?:[\s|'|\"]*)[:|=](?:[\s|'|\"]*)([a-z0-9\-_]{16,})",  # noqa: E501
         "AWS Access Key": r"AKIA[0-9A-Z]{16}",
         "Azure Secret": r"[a-z0-9]{3,45}~[a-z0-9._\-]{2,256}",
         "Stripe Secret Key": r"sk_(?:test|live)_[0-9a-zA-Z]{24,}",
         "GitHub Personal Access Token": r"ghp_[a-zA-Z0-9]{36}",
         "Private Key": r"-----BEGIN (?:RSA|OPENSSH|PRIVATE) KEY-----",
-        "IPv4 Address": r"(?<![a-zA-Z0-9>=v.])\b(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\b(?![.\d])",
-        "Credit Card": r"\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|3(?:0[0-5]|[68][0-9])[0-9]{11}|6(?:011|5[0-9]{2})[0-9]{12}|(?:2131|1800|35\d{3})\d{11})\b",
+        "IPv4 Address": r"(?<![a-zA-Z0-9>=v.])\b(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\b(?![.\d])",  # noqa: E501
+        "Credit Card": r"\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|3(?:0[0-5]|[68][0-9])[0-9]{11}|6(?:011|5[0-9]{2})[0-9]{12}|(?:2131|1800|35\d{3})\d{11})\b",  # noqa: E501
         "Phone Number": r"\b(?:\+?(\d{1,3}))?[-. (]*(\d{3})[-. )]*(\d{3})[-. ]*(\d{4})\b",
         # Modern cloud provider patterns
         "OpenAI API Key": r"sk-[a-zA-Z0-9]{20}T3BlbkFJ[a-zA-Z0-9]{20}",
         "Slack Bot Token": r"xoxb-[0-9]{11,13}-[0-9]{11,13}-[a-zA-Z0-9]{24}",
-        "Slack Webhook URL": r"https://hooks\.slack\.com/services/T[a-zA-Z0-9_]{8,}/B[a-zA-Z0-9_]{8,}/[a-zA-Z0-9_]{24}",
+        "Slack Webhook URL": r"https://hooks\.slack\.com/services/T[a-zA-Z0-9_]{8,}/B[a-zA-Z0-9_]{8,}/[a-zA-Z0-9_]{24}",  # noqa: E501
         "Google Cloud Service Account": r"\"type\":\s*\"service_account\"",
         "Twilio API Key": r"SK[0-9a-fA-F]{32}",
         "Mailgun API Key": r"key-[0-9a-zA-Z]{32}",
@@ -74,6 +74,36 @@ class LocalScanner:
         "Google Cloud Service Account",
     }
 
+    # Explicit severity map — avoids fragile substring matching
+    SEVERITY_MAP: dict[str, str] = {
+        "Email Address": "MEDIUM",
+        "Generic API Key": "HIGH",
+        "AWS Access Key": "HIGH",
+        "Azure Secret": "HIGH",
+        "Stripe Secret Key": "HIGH",
+        "GitHub Personal Access Token": "HIGH",
+        "Private Key": "HIGH",
+        "IPv4 Address": "LOW",
+        "Credit Card": "HIGH",
+        "Phone Number": "LOW",
+        "OpenAI API Key": "HIGH",
+        "Slack Bot Token": "HIGH",
+        "Slack Webhook URL": "HIGH",
+        "Google Cloud Service Account": "HIGH",
+        "Twilio API Key": "HIGH",
+        "Mailgun API Key": "HIGH",
+        "SendGrid API Key": "HIGH",
+        "JSON Web Token": "MEDIUM",
+        "Hugging Face Token": "HIGH",
+    }
+
+    # Pre-computed lowercase placeholder set to avoid rebuilding per call
+    _PLACEHOLDER_VALUES: frozenset[str] = frozenset({
+        "your_api_key", "example_token", "secret_key_here",
+        "your_google_gemini_api_key_here", "your_gemini_api_key_here",
+        "your_api_key_here",
+    })
+
     # Entropy threshold for detecting high-randomness strings (likely secrets)
     ENTROPY_THRESHOLD = 4.5
     ENTROPY_MIN_LENGTH = 20
@@ -82,7 +112,7 @@ class LocalScanner:
         self.root_path = Path(root_path)
         self.gitignore = self._load_gitignore()
         # Pre-compile all regex patterns for performance
-        self._compiled_patterns: dict[str, Pattern[str]] = {
+        self._compiled_patterns: dict[str, re.Pattern[str]] = {
             name: re.compile(
                 pattern,
                 re.IGNORECASE if name in self.CASE_INSENSITIVE_PATTERNS else 0,
@@ -93,7 +123,7 @@ class LocalScanner:
     def _load_gitignore(self) -> pathspec.PathSpec | None:
         gitignore_path = self.root_path / ".gitignore"
         if gitignore_path.exists():
-            with open(gitignore_path, "r") as f:
+            with open(gitignore_path) as f:
                 return pathspec.PathSpec.from_lines("gitignore", f)
         return None
 
@@ -102,6 +132,10 @@ class LocalScanner:
             relative_path = str(file_path.relative_to(self.root_path))
             return self.gitignore.match_file(relative_path)
         return False
+
+    def _get_severity(self, rule_name: str) -> str:
+        """Return the severity for a given rule, falling back to MEDIUM."""
+        return self.SEVERITY_MAP.get(rule_name, "MEDIUM")
 
     @staticmethod
     def _shannon_entropy(data: str) -> float:
@@ -112,7 +146,10 @@ class LocalScanner:
         for char in data:
             freq[char] = freq.get(char, 0) + 1
         length = len(data)
-        return -sum((count / length) * math.log2(count / length) for count in freq.values())
+        return -sum(
+            (count / length) * math.log2(count / length)
+            for count in freq.values()
+        )
 
     def _detect_high_entropy_strings(self, line: str) -> list[str]:
         """Extract tokens from assignment-like patterns and check their entropy."""
@@ -129,7 +166,7 @@ class LocalScanner:
     def scan_file(self, file_path: Path) -> list[Issue]:
         issues = []
         try:
-            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            with open(file_path, encoding="utf-8", errors="ignore") as f:
                 for line_num, line in enumerate(f, 1):
                     # Regex-based pattern matching (using pre-compiled patterns)
                     for name, compiled in self._compiled_patterns.items():
@@ -138,14 +175,14 @@ class LocalScanner:
                             # Basic heuristic to avoid false positives for Generic API Key
                             if name == "Generic API Key" and self._is_likely_false_positive(match.group(1)):
                                 continue
-                                
+
                             issues.append(Issue(
                                 file_path=str(file_path.relative_to(self.root_path)),
                                 line_number=line_num,
                                 rule_name=name,
-                                severity="HIGH" if any(k in name for k in ["Key", "Secret", "Token", "Private"]) else "MEDIUM",
+                                severity=self._get_severity(name),
                                 content=match.group(0).strip(),
-                                description=f"Potential {name} detected."
+                                description=f"Potential {name} detected.",
                             ))
 
                     # Entropy-based detection for strings not caught by regex
@@ -156,7 +193,7 @@ class LocalScanner:
                             rule_name="High Entropy String",
                             severity="MEDIUM",
                             content=token[:60] + "..." if len(token) > 60 else token,
-                            description="High-entropy string detected — possible embedded secret or key."
+                            description="High-entropy string detected — possible embedded secret or key.",
                         ))
         except Exception as e:
             logger.error(f"Error scanning file {file_path}: {e}")
@@ -169,13 +206,8 @@ class LocalScanner:
         # Too many repetitive characters
         if len(set(value)) < 4:
             return True
-        # Common placeholder names and patterns
-        placeholders = {
-            "YOUR_API_KEY", "example_token", "SECRET_KEY_HERE",
-            "your_google_gemini_api_key_here", "your_gemini_api_key_here",
-            "your_api_key_here",
-        }
-        if value.lower() in {p.lower() for p in placeholders}:
+        # Check against pre-computed placeholder set
+        if value.lower() in self._PLACEHOLDER_VALUES:
             return True
         # Catch generic placeholder patterns
         lower = value.lower()
@@ -186,18 +218,22 @@ class LocalScanner:
     def verify_with_ollama(self, issue: Issue) -> bool:
         """
         Uses a local LLM (Ollama) to verify if a detection is a real secret.
+        Only metadata (rule name, severity, length, entropy) is sent — not the raw secret.
         """
-        import requests
-        ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-        ollama_model = os.getenv("OLLAMA_MODEL", "gemma2")
+        from urllib.parse import urlparse
 
-        # Warn if Ollama host is not localhost — secrets would be sent over the network
+        import requests
+
+        ollama_host = config.OLLAMA_HOST
+        ollama_model = config.OLLAMA_MODEL
+
+        # Warn if Ollama host is not localhost — metadata would be sent over the network
         parsed = urlparse(ollama_host)
         hostname = parsed.hostname or ""
         if hostname not in ("localhost", "127.0.0.1", "::1"):
             logger.warning(
                 f"OLLAMA_HOST ({ollama_host}) is a remote host. "
-                "Secret content will be sent over the network for verification."
+                "Issue metadata will be sent over the network for verification."
             )
 
         try:
@@ -213,9 +249,9 @@ class LocalScanner:
                 json={
                     "model": ollama_model,
                     "prompt": prompt,
-                    "stream": False
+                    "stream": False,
                 },
-                timeout=5
+                timeout=30,
             )
             if response.status_code == 200:
                 result = response.json().get("response", "").strip().upper()
@@ -225,10 +261,15 @@ class LocalScanner:
             return True
         return True
 
-    def scan_directory(self, exclude_dirs: list[str] | None = None, use_ollama: bool = False, max_workers: int = 4) -> list[Issue]:
+    def scan_directory(
+        self,
+        exclude_dirs: list[str] | None = None,
+        use_ollama: bool = False,
+        max_workers: int = 4,
+    ) -> list[Issue]:
         all_issues: list[Issue] = []
         static_exclude = set(exclude_dirs or config.get_exclude_dirs())
-        
+
         files_to_scan = []
         for p in self.root_path.rglob("*"):
             if p.is_file():
@@ -245,8 +286,11 @@ class LocalScanner:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             results = executor.map(self.scan_file, files_to_scan)
             for file_issues in results:
-                if use_ollama:
-                    file_issues = [i for i in file_issues if self.verify_with_ollama(i)]
                 all_issues.extend(file_issues)
-        
+
+        # Ollama verification runs after all scanning is complete to avoid
+        # serializing HTTP calls inside the thread pool result loop
+        if use_ollama and all_issues:
+            all_issues = [i for i in all_issues if self.verify_with_ollama(i)]
+
         return all_issues

@@ -1,22 +1,26 @@
-import click
+import json
 import os
 import sys
-import json
 from pathlib import Path
+
+import click
 from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
 from rich.markdown import Markdown
-from .scanner import LocalScanner
+from rich.panel import Panel
+from rich.table import Table
+
 from .auditor import CloudAuditor
 from .config import config
+from .scanner import LocalScanner
 
 console = Console()
+
 
 @click.group()
 def main():
     """ShieldAgent-MCP: Hybrid AI Security Sentinel."""
     pass
+
 
 @main.command()
 @click.option("--dir", default=".", help="Directory to scan")
@@ -73,14 +77,17 @@ def audit(file):
     """Perform a deep AI audit on a specific file using Gemini."""
     api_key = config.GEMINI_API_KEY
     if not api_key:
-        console.print("[bold red]Error: GEMINI_API_KEY not found in environment or .env file.[/bold red]")
-        return
+        console.print(
+            "[bold red]Error: GEMINI_API_KEY not found in "
+            "environment or .env file.[/bold red]"
+        )
+        sys.exit(1)
 
     auditor = CloudAuditor(api_key)
     path = Path(file)
     
     with console.status(f"[bold cyan]Performing deep audit on {path.name}..."):
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             content = f.read()
         report = auditor.audit_file(path, content)
 
@@ -94,9 +101,15 @@ def install_hooks():
     
     if not hooks_dir.exists():
         if git_dir.is_file():
-            console.print("[bold red]Error: .git is a file (likely a submodule). Hook installation not supported directly.[/bold red]")
+            console.print(
+                "[bold red]Error: .git is a file (likely a submodule). "
+                "Hook installation not supported directly.[/bold red]"
+            )
         else:
-            console.print("[bold red]Error: No .git/hooks directory found. Run this in the repo root.[/bold red]")
+            console.print(
+                "[bold red]Error: No .git/hooks directory found. "
+                "Run this in the repo root.[/bold red]"
+            )
         return
         
     pre_push_path = hooks_dir / "pre-push"
@@ -137,18 +150,22 @@ exit 0
 def run_mcp():
     """Start the ShieldAgent MCP server for integration with AI assistants."""
     try:
-        from .mcp_server import mcp, HAS_MCP
+        from .mcp_server import HAS_MCP, mcp
         if not HAS_MCP:
-            console.print("[bold red]Error: MCP dependencies not found or incompatible Python version.[/bold red]")
+            console.print(
+                "[bold red]Error: MCP dependencies not found or "
+                "incompatible Python version.[/bold red]"
+            )
             console.print("Note: MCP requires Python 3.10+ and the 'mcp' package.")
             console.print("Install with: pip install 'shield-agent-mcp[mcp]'")
-            return
+            sys.exit(1)
         
         print("🛡️ Starting ShieldAgent MCP Server...", file=sys.stderr)
         # FastMCP.run() defaults to stdio if no arguments are passed
         mcp.run()
     except Exception as e:
         print(f"Error: Failed to start MCP server: {e}", file=sys.stderr)
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()

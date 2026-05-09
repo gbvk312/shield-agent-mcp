@@ -1,9 +1,8 @@
 """Tests for advanced scanner features: entropy, gitignore, case-sensitivity."""
 
-import pytest
-from pathlib import Path
-from shield_agent.scanner import LocalScanner, Issue
+from unittest.mock import patch
 
+from shield_agent.scanner import LocalScanner
 
 # --- Shannon Entropy Tests ---
 
@@ -164,6 +163,41 @@ class TestFalsePositiveFiltering:
         assert scanner._is_likely_false_positive("aB3xZ9kL7mN2pQ5rT8wY1cF4") is False
 
 
+# --- Severity Map Tests ---
+
+class TestSeverityMap:
+    def test_aws_key_is_high(self, tmp_path):
+        f = tmp_path / "test.txt"
+        f.write_text("AKIA1234567890ABCDEF")
+
+        scanner = LocalScanner(str(tmp_path))
+        issues = scanner.scan_file(f)
+        aws_issues = [i for i in issues if i.rule_name == "AWS Access Key"]
+        assert aws_issues[0].severity == "HIGH"
+
+    def test_email_is_medium(self, tmp_path):
+        f = tmp_path / "test.txt"
+        f.write_text("user@example.com")
+
+        scanner = LocalScanner(str(tmp_path))
+        issues = scanner.scan_file(f)
+        email_issues = [i for i in issues if i.rule_name == "Email Address"]
+        assert email_issues[0].severity == "MEDIUM"
+
+    def test_ipv4_is_low(self, tmp_path):
+        f = tmp_path / "test.txt"
+        f.write_text("server at 192.168.1.100 is down")
+
+        scanner = LocalScanner(str(tmp_path))
+        issues = scanner.scan_file(f)
+        ip_issues = [i for i in issues if i.rule_name == "IPv4 Address"]
+        assert ip_issues[0].severity == "LOW"
+
+    def test_unknown_rule_defaults_medium(self):
+        scanner = LocalScanner(".")
+        assert scanner._get_severity("Unknown Rule") == "MEDIUM"
+
+
 # --- Binary File Skipping Tests ---
 
 class TestBinaryFileSkipping:
@@ -174,3 +208,68 @@ class TestBinaryFileSkipping:
         scanner = LocalScanner(str(tmp_path))
         issues = scanner.scan_directory()
         assert len(issues) == 0
+
+
+# --- Ollama Verification Tests ---
+
+class TestOllamaVerification:
+    def test_verify_with_ollama_yes(self):
+        """Should return True when Ollama says YES."""
+        from shield_agent.scanner import Issue
+
+        scanner = LocalScanner(".")
+        issue = Issue(
+            file_path="test.py",
+            line_number=1,
+            rule_name="AWS Access Key",
+            severity="HIGH",
+            content="AKIA1234567890ABCDEF",
+            description="Potential AWS Access Key detected.",
+        )
+
+        mock_response = type("Response", (), {
+            "status_code": 200,
+            "json": lambda self: {"response": "YES"},
+        })()
+
+        with patch("requests.post", return_value=mock_response):
+            assert scanner.verify_with_ollama(issue) is True
+
+    def test_verify_with_ollama_no(self):
+        """Should return False when Ollama says NO."""
+        from shield_agent.scanner import Issue
+
+        scanner = LocalScanner(".")
+        issue = Issue(
+            file_path="test.py",
+            line_number=1,
+            rule_name="Email Address",
+            severity="MEDIUM",
+            content="test@example.com",
+            description="Potential Email Address detected.",
+        )
+
+        mock_response = type("Response", (), {
+            "status_code": 200,
+            "json": lambda self: {"response": "NO"},
+        })()
+
+        with patch("requests.post", return_value=mock_response):
+            assert scanner.verify_with_ollama(issue) is False
+
+    def test_verify_with_ollama_fallback_on_error(self):
+        """Should return True (keep issue) when Ollama is unreachable."""
+        from shield_agent.scanner import Issue
+
+        scanner = LocalScanner(".")
+        issue = Issue(
+            file_path="test.py",
+            line_number=1,
+            rule_name="AWS Access Key",
+            severity="HIGH",
+            content="AKIA1234567890ABCDEF",
+            description="Potential AWS Access Key detected.",
+        )
+
+        with patch("requests.post", side_effect=ConnectionError("refused")):
+            assert scanner.verify_with_ollama(issue) is True

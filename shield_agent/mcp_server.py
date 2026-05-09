@@ -1,13 +1,20 @@
+import logging
 import os
 import shutil
 from pathlib import Path
-from .scanner import LocalScanner
+
 from .auditor import CloudAuditor
+from .scanner import LocalScanner
+
+__all__ = ["HAS_MCP", "MAX_FILE_SIZE"]
+
+logger = logging.getLogger("shield_agent.mcp_server")
 
 # Maximum file size for read/audit operations (10 MB)
 MAX_FILE_SIZE = 10 * 1024 * 1024
 
-# Capture the server root at startup to prevent TOCTOU path traversal
+# Capture the server root at startup to prevent TOCTOU path traversal.
+# Tests should monkeypatch this value when running from a different CWD.
 _SERVER_ROOT = Path.cwd().resolve()
 
 try:
@@ -15,6 +22,22 @@ try:
     HAS_MCP = True
 except ImportError:
     HAS_MCP = False
+
+
+def _validate_path(path: Path, must_exist: bool = True) -> str | None:
+    """Validate that a resolved path is within _SERVER_ROOT.
+
+    Returns an error message string if validation fails, or None if the path is safe.
+    """
+    resolved = path.resolve()
+    try:
+        resolved.relative_to(_SERVER_ROOT)
+    except ValueError:
+        return f"❌ Error: Path '{path}' is outside the working directory. Access rejected."
+    if must_exist and not resolved.exists():
+        return f"❌ Error: Path '{path}' not found."
+    return None
+
 
 # Initialize the MCP Server (if library available)
 if HAS_MCP:
@@ -31,19 +54,27 @@ if HAS_MCP:
         """
         import anyio
         
-        def run_scan():
-            scanner = LocalScanner(directory)
-            return scanner.scan_directory(use_ollama=use_ollama)
-            
-        issues = await anyio.to_thread.run_sync(run_scan)
-        
-        if not issues:
-            return "✅ No security issues found."
-        
-        report = "🚨 Detected Security Issues:\n"
-        for issue in issues:
-            report += f"- {issue.file_path}:{issue.line_number} [{issue.rule_name}] ({issue.severity})\n"
-        return report
+        path = Path(directory).resolve()
+        error = _validate_path(path)
+        if error:
+            return error
+
+        def run_scan() -> str:
+            scanner = LocalScanner(str(path))
+            issues = scanner.scan_directory(use_ollama=use_ollama)
+
+            if not issues:
+                return "✅ No security issues found."
+
+            report = "🚨 Detected Security Issues:\n"
+            for issue in issues:
+                report += (
+                    f"- {issue.file_path}:{issue.line_number} "
+                    f"[{issue.rule_name}] ({issue.severity})\n"
+                )
+            return report
+
+        return await anyio.to_thread.run_sync(run_scan)
 
     @mcp.tool()
     async def list_directory(directory: str = ".") -> str:
@@ -53,9 +84,10 @@ if HAS_MCP:
         Args:
             directory: The path to the directory to list.
         """
-        path = Path(directory)
-        if not path.exists():
-            return f"❌ Error: Directory {directory} not found."
+        path = Path(directory).resolve()
+        error = _validate_path(path)
+        if error:
+            return error
         
         try:
             items = os.listdir(path)
@@ -79,9 +111,10 @@ if HAS_MCP:
         Args:
             file_path: The path to the file to read.
         """
-        path = Path(file_path)
-        if not path.exists():
-            return f"❌ Error: File {file_path} not found."
+        path = Path(file_path).resolve()
+        error = _validate_path(path)
+        if error:
+            return error
         
         try:
             file_size = path.stat().st_size
@@ -100,17 +133,18 @@ if HAS_MCP:
         if not api_key:
             return "❌ Error: GEMINI_API_KEY not configured."
         
-        path = Path(file_path)
-        if not path.exists():
-            return f"❌ Error: File {file_path} not found."
+        path = Path(file_path).resolve()
+        error = _validate_path(path)
+        if error:
+            return error
 
         file_size = path.stat().st_size
         if file_size > MAX_FILE_SIZE:
             return f"❌ File too large ({file_size:,} bytes). Max: {MAX_FILE_SIZE:,} bytes."
             
-        def run_audit():
+        def run_audit() -> str:
             auditor = CloudAuditor(api_key)
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 content = f.read()
             return auditor.audit_file(path, content)
             
@@ -131,18 +165,24 @@ if HAS_MCP:
         
         path = Path(file_path).resolve()
         
-        def do_write():
-            # Path traversal protection: reject paths with '..' segments
+        def do_write() -> str:
+            # Path traversal protection: reject paths outside server root
             try:
                 path.relative_to(_SERVER_ROOT)
             except ValueError:
-                return f"❌ Error: Path '{file_path}' is outside the working directory. Write rejected."
+                return (
+                    f"❌ Error: Path '{file_path}' is outside the "
+                    "working directory. Write rejected."
+                )
 
             # Safety: don't write to sensitive files
             base_name = path.name.lower()
             sensitive_names = {".env", "id_rsa", ".ssh", ".env.production", ".env.local"}
             if base_name in sensitive_names or base_name.startswith(".env"):
-                return f"⚠️ Warning: Direct write to {base_name} is restricted. Use specialized tools for secrets."
+                return (
+                    f"⚠️ Warning: Direct write to {base_name} is restricted. "
+                    "Use specialized tools for secrets."
+                )
             
             # Create backup if exists (copy, not move, so original survives a failed write)
             if path.exists():
@@ -167,9 +207,10 @@ if HAS_MCP:
         Identifies potential exposure of services.
         """
         import subprocess
+
         import anyio
 
-        def run_check():
+        def run_check() -> str:
             try:
                 import platform
                 # Use platform-appropriate command
@@ -181,7 +222,7 @@ if HAS_MCP:
                     cmd, 
                     capture_output=True, 
                     text=True, 
-                    check=True
+                    check=True,
                 )
                 lines = result.stdout.splitlines()
                 listeners = [line for line in lines if "LISTEN" in line]
@@ -199,7 +240,7 @@ if HAS_MCP:
         return await anyio.to_thread.run_sync(run_check)
 
 else:
-    def main():
+    def main() -> None:
         print("MCP Server functionality requires the 'mcp' library and Python 3.10+.")
         print("Install it using: pip install shield-agent-mcp")
 

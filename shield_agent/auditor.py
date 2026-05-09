@@ -1,6 +1,12 @@
+import logging
 from pathlib import Path
+
 from google import genai
 from google.genai import types
+
+__all__ = ["CloudAuditor"]
+
+logger = logging.getLogger("shield_agent.auditor")
 
 
 class CloudAuditor:
@@ -44,7 +50,9 @@ If no critical issues are found, state 'Analysis complete: No critical flaws det
                 return response.text or "No response generated."
             except Exception as e:
                 if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                    logger.info(f"Model {model} rate-limited, trying next fallback.")
                     continue
+                logger.exception(f"Error during {error_prefix} with model {model}")
                 return f"Error during {error_prefix}: {str(e)}"
 
         return f"❌ Error: All available models for {error_prefix} are currently rate-limited."
@@ -59,6 +67,9 @@ If no critical issues are found, state 'Analysis complete: No critical flaws det
         """Analyzes a git diff for potential impact."""
         return self._call_with_fallback(
             contents=f"Diff Content:\n---\n{diff_text}\n---",
-            extra_instruction="Focus heavily on security regressions or newly introduced architectural flaws in this diff.",
+            extra_instruction=(
+                "Focus heavily on security regressions or newly "
+                "introduced architectural flaws in this diff."
+            ),
             error_prefix="diff audit",
         )
