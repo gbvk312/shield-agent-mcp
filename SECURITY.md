@@ -13,7 +13,7 @@ We currently provide security updates for the following versions:
 
 As a security tool, we take the security of this project very seriously. If you find a security vulnerability, please do NOT create a public issue.
 
-Instead, please report security vulnerabilities by emailing [INSERT EMAIL].
+Instead, please report security vulnerabilities by emailing [gbvk.312@gmail.com](mailto:gbvk.312@gmail.com).
 
 We will acknowledge your report within 48 hours and provide a more detailed response within 1 week, including a timeline for a fix if necessary.
 

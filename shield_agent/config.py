@@ -25,6 +25,6 @@ class Config:
     @staticmethod
     def get_exclude_dirs() -> list[str]:
         # Future: Load from shield-agent.yaml
-        return [".git", "__pycache__", "venv", "node_modules", ".venv"]
+        return [".git", "__pycache__", "venv", ".venv", "node_modules", "scratch"]
 
 config = Config()

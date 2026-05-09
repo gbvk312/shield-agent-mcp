@@ -7,6 +7,9 @@ from .auditor import CloudAuditor
 # Maximum file size for read/audit operations (10 MB)
 MAX_FILE_SIZE = 10 * 1024 * 1024
 
+# Capture the server root at startup to prevent TOCTOU path traversal
+_SERVER_ROOT = Path.cwd().resolve()
+
 try:
     from mcp.server.fastmcp import FastMCP
     HAS_MCP = True
@@ -131,7 +134,7 @@ if HAS_MCP:
         def do_write():
             # Path traversal protection: reject paths with '..' segments
             try:
-                path.relative_to(Path.cwd().resolve())
+                path.relative_to(_SERVER_ROOT)
             except ValueError:
                 return f"❌ Error: Path '{file_path}' is outside the working directory. Write rejected."
 
@@ -168,9 +171,14 @@ if HAS_MCP:
 
         def run_check():
             try:
-                # Use lsof for macOS/Linux to find listening ports
+                import platform
+                # Use platform-appropriate command
+                if platform.system() == "Windows":
+                    cmd = ["netstat", "-an"]
+                else:
+                    cmd = ["lsof", "-i", "-P", "-n"]
                 result = subprocess.run(
-                    ["lsof", "-i", "-P", "-n"], 
+                    cmd, 
                     capture_output=True, 
                     text=True, 
                     check=True
@@ -193,7 +201,7 @@ if HAS_MCP:
 else:
     def main():
         print("MCP Server functionality requires the 'mcp' library and Python 3.10+.")
-        print("Install it using: pip install 'shield-agent-mcp[mcp]'")
+        print("Install it using: pip install shield-agent-mcp")
 
 if __name__ == "__main__":
     if HAS_MCP:

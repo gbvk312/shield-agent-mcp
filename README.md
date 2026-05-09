@@ -46,7 +46,7 @@ Exposes standardized tools to your AI agent ecosystem:
 ### Using `uv` (Recommended)
 ```bash
 # Clone and install
-git clone https://github.com/gbvk/shield-agent-mcp.git
+git clone https://github.com/gbvk312/shield-agent-mcp.git
 cd shield-agent-mcp
 uv sync
 
@@ -57,8 +57,6 @@ uv run shield-agent --help
 ### Using `pip`
 ```bash
 pip install .
-# Or with MCP support explicitly
-pip install ".[mcp]"
 ```
 
 ---

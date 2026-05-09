@@ -1,7 +1,7 @@
 # ShieldAgent-MCP Architecture Context
 
 ## Overview
-ShieldAgent-MCP is a hybrid security and code quality sentinel. It combines fast local regex-based scanning for sensitive data (secrets, PII) and leverages advanced LLMs (specifically Google Gemini 1.5/2.0) for in-depth architectural and vulnerability auditing. The tool exposes its capabilities natively via the Model Context Protocol (MCP) using `FastMCP`.
+ShieldAgent-MCP is a hybrid security and code quality sentinel. It combines fast local regex-based scanning for sensitive data (secrets, PII) and leverages advanced LLMs (specifically Google Gemini 2.0 Flash) for in-depth architectural and vulnerability auditing. The tool exposes its capabilities natively via the Model Context Protocol (MCP) using `FastMCP`.
 
 ## Project Structure
 - `shield_agent/cli.py`: The entry point for the CLI using `click` and `rich`. Exposes commands for `scan`, `audit`, `run-mcp`, and `install-hooks`.

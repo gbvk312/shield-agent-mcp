@@ -3,14 +3,15 @@ import os
 import math
 import logging
 from pathlib import Path
-from typing import List, Optional, Dict, Pattern
+from re import Pattern
+
 from pydantic import BaseModel
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse
 import pathspec
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+from .config import config
+
 logger = logging.getLogger("shield_agent.scanner")
 
 class Issue(BaseModel):
@@ -41,7 +42,7 @@ class LocalScanner:
 
     
     # Common Patterns (Secrets & PII)
-    PATTERNS: Dict[str, str] = {
+    PATTERNS: dict[str, str] = {
         "Email Address": r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",
         "Generic API Key": r"(?i)(?:key|api|token|secret|password|auth)(?:[\s|'|\"]*)[:|=](?:[\s|'|\"]*)([a-z0-9\-_]{16,})",
         "AWS Access Key": r"AKIA[0-9A-Z]{16}",
@@ -64,6 +65,15 @@ class LocalScanner:
         "Hugging Face Token": r"hf_[a-zA-Z0-9]{34}",
     }
 
+    # Patterns that are genuinely case-insensitive (emails, generic keys, etc.)
+    # All others (AWS AKIA, Stripe sk_, GitHub ghp_, etc.) use case-sensitive matching.
+    CASE_INSENSITIVE_PATTERNS: set[str] = {
+        "Email Address",
+        "Generic API Key",
+        "Azure Secret",
+        "Google Cloud Service Account",
+    }
+
     # Entropy threshold for detecting high-randomness strings (likely secrets)
     ENTROPY_THRESHOLD = 4.5
     ENTROPY_MIN_LENGTH = 20
@@ -72,16 +82,19 @@ class LocalScanner:
         self.root_path = Path(root_path)
         self.gitignore = self._load_gitignore()
         # Pre-compile all regex patterns for performance
-        self._compiled_patterns: Dict[str, Pattern[str]] = {
-            name: re.compile(pattern, re.IGNORECASE)
+        self._compiled_patterns: dict[str, Pattern[str]] = {
+            name: re.compile(
+                pattern,
+                re.IGNORECASE if name in self.CASE_INSENSITIVE_PATTERNS else 0,
+            )
             for name, pattern in self.PATTERNS.items()
         }
 
-    def _load_gitignore(self) -> Optional[pathspec.PathSpec]:
+    def _load_gitignore(self) -> pathspec.PathSpec | None:
         gitignore_path = self.root_path / ".gitignore"
         if gitignore_path.exists():
             with open(gitignore_path, "r") as f:
-                return pathspec.PathSpec.from_lines("gitwildmatch", f)
+                return pathspec.PathSpec.from_lines("gitignore", f)
         return None
 
     def _is_ignored(self, file_path: Path) -> bool:
@@ -95,13 +108,13 @@ class LocalScanner:
         """Calculate Shannon entropy of a string."""
         if not data:
             return 0.0
-        freq: Dict[str, int] = {}
+        freq: dict[str, int] = {}
         for char in data:
             freq[char] = freq.get(char, 0) + 1
         length = len(data)
         return -sum((count / length) * math.log2(count / length) for count in freq.values())
 
-    def _detect_high_entropy_strings(self, line: str) -> List[str]:
+    def _detect_high_entropy_strings(self, line: str) -> list[str]:
         """Extract tokens from assignment-like patterns and check their entropy."""
         hits = []
         # Match quoted strings in assignments: key = "value" or key: "value"
@@ -113,7 +126,7 @@ class LocalScanner:
                     hits.append(token)
         return hits
 
-    def scan_file(self, file_path: Path) -> List[Issue]:
+    def scan_file(self, file_path: Path) -> list[Issue]:
         issues = []
         try:
             with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
@@ -188,7 +201,13 @@ class LocalScanner:
             )
 
         try:
-            prompt = f"Identify if the following string is likely a real sensitive API key or secret password. Respond with only 'YES' or 'NO'.\nString: {issue.content}"
+            prompt = (
+                f"A security scanner flagged a string as a potential '{issue.rule_name}' "
+                f"(severity: {issue.severity}) in file '{issue.file_path}' at line {issue.line_number}. "
+                f"The string is {len(issue.content)} characters long with Shannon entropy "
+                f"{LocalScanner._shannon_entropy(issue.content):.2f}. "
+                "Based on this metadata, is this likely a real secret? Respond with only 'YES' or 'NO'."
+            )
             response = requests.post(
                 f"{ollama_host}/api/generate",
                 json={
@@ -206,9 +225,9 @@ class LocalScanner:
             return True
         return True
 
-    def scan_directory(self, exclude_dirs: Optional[List[str]] = None, use_ollama: bool = False, max_workers: int = 4) -> List[Issue]:
-        all_issues = []
-        static_exclude = set(exclude_dirs or [".git", "__pycache__", "venv", ".venv", "node_modules", "scratch"])
+    def scan_directory(self, exclude_dirs: list[str] | None = None, use_ollama: bool = False, max_workers: int = 4) -> list[Issue]:
+        all_issues: list[Issue] = []
+        static_exclude = set(exclude_dirs or config.get_exclude_dirs())
         
         files_to_scan = []
         for p in self.root_path.rglob("*"):

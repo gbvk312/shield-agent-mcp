@@ -8,7 +8,7 @@ We recommend using `uv` for dependency management.
 
 ```bash
 # Clone the repository
-git clone https://github.com/gbvk/shield-agent-mcp.git
+git clone https://github.com/gbvk312/shield-agent-mcp.git
 cd shield-agent-mcp
 
 # Sync dependencies and create venv

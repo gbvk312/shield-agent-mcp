@@ -74,4 +74,4 @@ Add this to your `claude_desktop_config.json`:
 
 - **Gemini Errors**: Ensure your API key has "Gemini 2.0 Flash" access. Paid and free tier keys both work, but free tier is subject to rate limits.
 - **Ollama Connection**: If Ollama is running on a different port or machine, ensure `OLLAMA_HOST` is set correctly.
-- **Python Version**: MCP features require **Python 3.10+**.
+- **Python Version**: MCP features require **Python 3.11+**.
