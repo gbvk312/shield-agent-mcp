@@ -320,6 +320,7 @@ class LocalScanner:
         exclude_dirs: list[str] | None = None,
         use_ollama: bool = False,
         max_workers: int = 4,
+        scan_env: bool = False,
     ) -> list[Issue]:
         all_issues: list[Issue] = []
         static_exclude = set(exclude_dirs or config.get_exclude_dirs())
@@ -333,7 +334,9 @@ class LocalScanner:
                 # Check static excludes and .gitignore
                 if any(part in static_exclude for part in p.parts):
                     continue
-                if self._is_ignored(p):
+                
+                is_env_file = p.name == ".env" or p.name.startswith(".env.")
+                if self._is_ignored(p) and not (scan_env and is_env_file):
                     continue
                 files_to_scan.append(p)
 
@@ -343,8 +346,15 @@ class LocalScanner:
                 all_issues.extend(file_issues)
 
         # Ollama verification runs after all scanning is complete to avoid
-        # serializing HTTP calls inside the thread pool result loop
+        # serializing HTTP calls inside the thread pool result loop.
+        # We use a ThreadPoolExecutor to verify concurrently.
         if use_ollama and all_issues:
-            all_issues = [i for i in all_issues if self.verify_with_ollama(i)]
+            valid_issues = []
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                verification_results = executor.map(lambda i: (i, self.verify_with_ollama(i)), all_issues)
+                for issue, is_valid in verification_results:
+                    if is_valid:
+                        valid_issues.append(issue)
+            all_issues = valid_issues
 
         return all_issues

@@ -25,13 +25,14 @@ def main():
 @main.command()
 @click.option("--dir", default=".", help="Directory to scan")
 @click.option("--ollama", is_flag=True, help="Use local Ollama for verification")
+@click.option("--scan-env", is_flag=True, help="Scan .env files even if ignored by .gitignore")
 @click.option("--format", type=click.Choice(["text", "json", "jsonl"]), default="text", help="Output format")
-def scan(dir, ollama, format):
+def scan(dir, ollama, scan_env, format):
     """Run a local security scan for PII and secrets."""
     scanner = LocalScanner(dir)
 
     with console.status("[bold green]Scanning for leaks..."):
-        issues = scanner.scan_directory(use_ollama=ollama)
+        issues = scanner.scan_directory(use_ollama=ollama, scan_env=scan_env)
 
     if format == "json":
         click.echo(json.dumps([i.model_dump() for i in issues], indent=2))
