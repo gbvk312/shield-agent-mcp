@@ -1,6 +1,7 @@
 import logging
 import os
 import shutil
+import re
 from pathlib import Path
 
 from .auditor import CloudAuditor
@@ -37,6 +38,21 @@ def _validate_path(path: Path, must_exist: bool = True) -> str | None:
         return f"❌ Error: Path '{path}' is outside the working directory. Access rejected."
     if must_exist and not resolved.exists():
         return f"❌ Error: Path '{path}' not found."
+    return None
+
+
+def _prompt_firewall(content: str) -> str | None:
+    """Basic prompt injection firewall to protect MCP tools."""
+    suspicious_patterns = [
+        r"ignore\s+(all\s+)?previous\s+instructions",
+        r"you\s+are\s+now",
+        r"system\s+prompt",
+        r"bypass",
+    ]
+    content_lower = content.lower()
+    for pattern in suspicious_patterns:
+        if re.search(pattern, content_lower):
+            return f"🚫 Firewall Blocked: Suspicious prompt injection pattern detected ('{pattern}')."
     return None
 
 
@@ -141,9 +157,14 @@ if HAS_MCP:
             return f"❌ File too large ({file_size:,} bytes). Max: {MAX_FILE_SIZE:,} bytes."
 
         def run_audit() -> str:
-            auditor = CloudAuditor(api_key)
             with open(path, encoding="utf-8") as f:
                 content = f.read()
+                
+            fw_error = _prompt_firewall(content)
+            if fw_error:
+                return fw_error
+                
+            auditor = CloudAuditor(api_key)
             return auditor.audit_file(path, content)
 
         return await anyio.to_thread.run_sync(run_audit)
@@ -164,6 +185,13 @@ if HAS_MCP:
         path = Path(file_path).resolve()
 
         def do_write() -> str:
+            fw_error = _prompt_firewall(content)
+            if fw_error:
+                return fw_error
+            fw_error_reason = _prompt_firewall(reason)
+            if fw_error_reason:
+                return fw_error_reason
+
             # Path traversal protection: reject paths outside server root
             try:
                 path.relative_to(_SERVER_ROOT)
@@ -224,6 +252,57 @@ if HAS_MCP:
                 return f"❌ Error restoring backup: {str(e)}"
 
         return await anyio.to_thread.run_sync(do_restore)
+
+    @mcp.tool()
+    async def scan_supply_chain(directory: str = ".") -> str:
+        """
+        Scans CI/CD pipelines and Dockerfiles for supply chain vulnerabilities.
+        Checks for mutable tags in GitHub Actions and permissive scopes.
+        """
+        import anyio
+        import re
+
+        path = Path(directory).resolve()
+        error = _validate_path(path)
+        if error:
+            return error
+
+        def run_scan() -> str:
+            issues = []
+            
+            # Check GitHub Actions
+            workflows_dir = path / ".github" / "workflows"
+            if workflows_dir.exists() and workflows_dir.is_dir():
+                for yaml_file in workflows_dir.glob("*.yml"):
+                    content = yaml_file.read_text(encoding="utf-8", errors="ignore")
+                    lines = content.splitlines()
+                    for i, line in enumerate(lines, 1):
+                        # Check for mutable tags (e.g., uses: actions/checkout@v3 or @main)
+                        match = re.search(r"uses:\s+[^@]+@([a-zA-Z0-9\.\-_]+)", line)
+                        if match:
+                            tag = match.group(1)
+                            if not re.match(r"^[a-fA-F0-9]{40}$", tag):
+                                issues.append(f"  - ⚠️ {yaml_file.name}:{i} Mutable tag used ('{tag}'). Pin to a commit SHA.")
+                        
+                        # Check for write-all permissions
+                        if "write-all" in line.lower() and "permissions:" in content.lower():
+                            issues.append(f"  - 🚨 {yaml_file.name}:{i} Overly permissive scope 'write-all' detected.")
+
+            # Check Dockerfiles
+            for dockerfile in path.rglob("Dockerfile*"):
+                content = dockerfile.read_text(encoding="utf-8", errors="ignore")
+                lines = content.splitlines()
+                for i, line in enumerate(lines, 1):
+                    if line.strip().upper().startswith("FROM "):
+                        if "@sha256:" not in line:
+                            issues.append(f"  - ⚠️ {dockerfile.relative_to(path)}:{i} Unpinned base image used ('{line.strip()}'). Pin to a @sha256 digest.")
+
+            if not issues:
+                return "✅ Supply chain scan clean. No unpinned actions or loose permissions found."
+            
+            return "🚨 Supply Chain Vulnerabilities Detected:\n" + "\n".join(issues)
+
+        return await anyio.to_thread.run_sync(run_scan)
 
     @mcp.tool()
     async def check_network_exposure() -> str:
