@@ -1,5 +1,6 @@
+
 import pytest
-from pathlib import Path
+
 from shield_agent.mcp_server import HAS_MCP
 
 pytestmark = pytest.mark.skipif(not HAS_MCP, reason="MCP not available")

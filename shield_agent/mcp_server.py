@@ -1,7 +1,7 @@
 import logging
 import os
-import shutil
 import re
+import shutil
 from pathlib import Path
 
 from .auditor import CloudAuditor
@@ -259,8 +259,9 @@ if HAS_MCP:
         Scans CI/CD pipelines and Dockerfiles for supply chain vulnerabilities.
         Checks for mutable tags in GitHub Actions and permissive scopes.
         """
-        import anyio
         import re
+
+        import anyio
 
         path = Path(directory).resolve()
         error = _validate_path(path)
@@ -282,7 +283,10 @@ if HAS_MCP:
                         if match:
                             tag = match.group(1)
                             if not re.match(r"^[a-fA-F0-9]{40}$", tag):
-                                issues.append(f"  - ⚠️ {yaml_file.name}:{i} Mutable tag used ('{tag}'). Pin to a commit SHA.")
+                                issues.append(
+                                    f"  - ⚠️ {yaml_file.name}:{i} Mutable tag used ('{tag}'). "
+                                    "Pin to a commit SHA."
+                                )
                         
                         # Check for write-all permissions
                         if "write-all" in line.lower() and "permissions:" in content.lower():
@@ -295,7 +299,10 @@ if HAS_MCP:
                 for i, line in enumerate(lines, 1):
                     if line.strip().upper().startswith("FROM "):
                         if "@sha256:" not in line:
-                            issues.append(f"  - ⚠️ {dockerfile.relative_to(path)}:{i} Unpinned base image used ('{line.strip()}'). Pin to a @sha256 digest.")
+                            issues.append(
+                                f"  - ⚠️ {dockerfile.relative_to(path)}:{i} Unpinned base image used "
+                                f"('{line.strip()}'). Pin to a @sha256 digest."
+                            )
 
             if not issues:
                 return "✅ Supply chain scan clean. No unpinned actions or loose permissions found."
