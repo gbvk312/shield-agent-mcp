@@ -46,6 +46,9 @@ jobs:
               'README.md',               # Contains usage examples
               'pyproject.toml',          # Contains placeholder author email
               'scratch/',                # Test/scratch files
+              'SECURITY.md',             # Contains placeholder email
+              'tests/',                  # Contains mock secrets for testing
+              'shield_agent/mcp_server.py', # Contains local IP bindings
           }
 
           real_issues = []
